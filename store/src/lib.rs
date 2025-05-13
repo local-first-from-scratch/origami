@@ -1,4 +1,8 @@
 mod utils;
+mod timestamp;
+
+#[cfg(test)]
+mod test_helpers;
 
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;

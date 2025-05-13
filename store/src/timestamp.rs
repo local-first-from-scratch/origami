@@ -1,0 +1,28 @@
+use facet::Facet;
+use uuid::Uuid;
+
+#[derive(Debug, Facet, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+pub struct Timestamp {
+    counter: u64,
+    #[cfg_attr(test, proptest(strategy = "crate::test_helpers::uuid()"))]
+    node: Uuid,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use pretty_assertions::assert_eq;
+    use proptest::proptest;
+
+    proptest! {
+        #[test]
+        fn sort_by_counter_then_node(a: Timestamp, b: Timestamp) {
+            if a.counter != b.counter {
+                assert_eq!(a.counter.cmp(&b.counter), a.cmp(&b));
+            } else {
+                assert_eq!(a.node.cmp(&b.node), a.cmp(&b));
+            }
+        }
+    }
+}
