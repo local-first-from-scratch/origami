@@ -12,5 +12,5 @@ extern "C" {
 pub fn greet() {
     set_panic_hook();
 
-    alert("Hello, document!");
+    alert("Hello, store!");
 }

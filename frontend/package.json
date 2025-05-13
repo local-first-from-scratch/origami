@@ -12,7 +12,7 @@
 	},
 	"dependencies": {
 		"vue": "3.5.13",
-		"document": "file:../document/pkg"
+		"store": "file:../store/pkg"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "1.9.4",

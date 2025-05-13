@@ -26,13 +26,13 @@ jobs:
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
       - name: Build with wasm-pack
-        run: wasm-pack build document
+        run: wasm-pack build store
 
       - name: Upload WebAssembly artifact
         uses: actions/upload-artifact@v4
         with:
-          name: document
-          path: document/pkg/
+          name: store
+          path: store/pkg/
 
   rust-test:
     name: Rust Tests
@@ -111,11 +111,11 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Download document WASM artifact
+      - name: Download store WASM artifact
         uses: actions/download-artifact@v4
         with:
-          name: document
-          path: document/pkg
+          name: store
+          path: store/pkg
 
       - name: Install dependencies
         run: bun install

@@ -1,15 +1,15 @@
 all: frontend/dist/index.html
 
-Cargo.lock: Cargo.toml document/Cargo.toml
+Cargo.lock: Cargo.toml store/Cargo.toml
 	cargo build
 
-document/pkg/package.json: document/src/* document/Cargo.toml Cargo.lock
-	wasm-pack build document
+store/pkg/package.json: store/src/* store/Cargo.toml Cargo.lock
+	wasm-pack build store
 
 frontend/bun.lock: frontend/package.json
 	cd frontend; bun install
 
-frontend/dist/index.html: frontend/src/* frontend/package.json frontend/bun.lock document/pkg/package.json
+frontend/dist/index.html: frontend/src/* frontend/package.json frontend/bun.lock store/pkg/package.json
 	cd frontend; bun run build
 
 .PHONY: lint
@@ -20,4 +20,4 @@ lint:
 
 .PHONY: clean
 clean:
-	rm -rf frontend/dist document/pkg target
+	rm -rf frontend/dist store/pkg target
