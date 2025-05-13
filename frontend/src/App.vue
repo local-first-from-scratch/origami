@@ -1,3 +1,9 @@
+<script setup lang="ts">
+import * as store from "store";
+
+store.greet();
+</script>
+
 <template>
   <div class="content">
     <h1>Rsbuild with Vue</h1>
