@@ -25,3 +25,8 @@ clean:
 .PHONY: dev
 dev: frontend/bun.lock
 	cd frontend; bun run dev
+
+.PHONY: format
+format:
+	cd frontend; bun run format
+	cargo fmt
