@@ -17,3 +17,7 @@ lint:
 	cargo fmt --check
 	cargo clippy -- -D warnings
 	cd frontend; bun run check
+
+.PHONY: clean
+clean:
+	rm -rf frontend/dist document/pkg target
