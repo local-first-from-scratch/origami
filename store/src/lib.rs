@@ -1,5 +1,7 @@
-mod utils;
+mod document;
+mod operation;
 mod timestamp;
+mod utils;
 
 #[cfg(test)]
 mod test_helpers;
