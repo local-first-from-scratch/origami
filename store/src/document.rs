@@ -1,10 +1,9 @@
 use crate::operation::Operation;
 use crate::timestamp::Timestamp;
-use facet::Facet;
 use std::collections::BTreeSet;
 use uuid::Uuid;
 
-#[derive(Debug, Facet)]
+#[derive(Debug)]
 pub struct Document<Val: Ord> {
     operations: BTreeSet<(Timestamp, Operation<Val>)>,
 }

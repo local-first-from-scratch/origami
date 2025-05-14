@@ -1,7 +1,6 @@
-use facet::Facet;
 use uuid::Uuid;
 
-#[derive(Debug, Facet, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct Timestamp {
     pub counter: u64,
