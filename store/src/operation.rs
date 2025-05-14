@@ -2,7 +2,7 @@ use crate::timestamp::Timestamp;
 use facet::Facet;
 use std::collections::BTreeSet;
 
-#[derive(Facet, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Facet, PartialOrd, Ord, PartialEq, Eq)]
 #[repr(C)]
 pub enum Operation<Val> {
     MakeMap,
@@ -26,7 +26,7 @@ pub enum Operation<Val> {
     },
 }
 
-#[derive(Facet, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Facet, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(C)]
 pub enum AssignKey {
     // TODO: numeric keys as well?

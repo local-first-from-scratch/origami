@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import * as store from "store";
 
-store.greet();
+store.dry_run();
 </script>
 
 <template>

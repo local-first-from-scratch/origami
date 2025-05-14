@@ -1,12 +1,18 @@
 use facet::Facet;
 use uuid::Uuid;
 
-#[derive(Debug, Facet, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Facet, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct Timestamp {
-    counter: u64,
+    pub counter: u64,
     #[cfg_attr(test, proptest(strategy = "crate::test_helpers::uuid()"))]
-    node: Uuid,
+    pub node: Uuid,
+}
+
+impl Timestamp {
+    pub fn new(counter: u64, node: Uuid) -> Self {
+        Self { counter, node }
+    }
 }
 
 #[cfg(test)]
