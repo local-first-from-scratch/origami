@@ -1,4 +1,4 @@
-use crate::operation::Operation;
+use crate::operation::{AssignKey, Operation};
 use crate::timestamp::Timestamp;
 use std::collections::BTreeSet;
 use uuid::Uuid;
@@ -23,7 +23,7 @@ impl<Val: Ord> Document<Val> {
             .unwrap_or(0)
     }
 
-    pub fn root<'doc>(&'doc self) -> Option<Object<'doc, Val>> {
+    pub fn root<'doc>(&'doc mut self) -> Option<Object<'doc, Val>> {
         for (id, op) in &self.operations {
             match op {
                 Operation::MakeMap => {
@@ -50,6 +50,28 @@ impl<Val: Ord> Document<Val> {
             document: self,
         }
     }
+
+    fn make_val(&mut self, val: Val, node: Uuid) -> Timestamp {
+        let id = Timestamp::new(self.next_timestamp_counter(), node);
+        self.operations.insert((id, Operation::MakeVal { val }));
+
+        id
+    }
+
+    fn make_assign(&mut self, obj: Timestamp, key: &str, val: Timestamp, prev: BTreeSet<Timestamp>, node: Uuid) -> Timestamp {
+        let id = Timestamp::new(self.next_timestamp_counter(), node);
+        self.operations.insert((
+            id,
+            Operation::Assign {
+                obj,
+                key: AssignKey::ObjectKey(key.to_string()),
+                val,
+                prev,
+            }
+        ));
+
+        id
+    }
 }
 
 #[derive(Debug)]
@@ -60,5 +82,19 @@ pub enum Object<'doc, Val: Ord> {
 #[derive(Debug)]
 pub struct Map<'doc, Val: Ord> {
     subject: Timestamp,
-    document: &'doc Document<Val>,
+    document: &'doc mut Document<Val>,
+}
+
+impl<'doc, Val: Ord> Map<'doc, Val> {
+    pub fn set(&mut self, key: &str, val: Val, node: Uuid) {
+        let val_id = self.document.make_val(val, node);
+        self.document.make_assign(
+            self.subject,
+            key,
+            val_id,
+            // TODO: get the current assignments of this key
+            BTreeSet::new(),
+            node,
+        );
+    }
 }
