@@ -40,17 +40,8 @@ pub fn dry_run() {
         match doc.root() {
             Some(document::Object::Map(map)) => {
                 log(&format!("got a map after insertion, as expected: {map:#?}"));
-            },
-            None => {
-                log("no map after insertion, contrary to expectations")
             }
+            None => log("no map after insertion, contrary to expectations"),
         }
     }
-}
-
-#[wasm_bindgen]
-pub fn greet() {
-    set_panic_hook();
-
-    log("Hello, store!");
 }
