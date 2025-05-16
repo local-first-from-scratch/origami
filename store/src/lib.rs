@@ -27,23 +27,16 @@ pub fn dry_run() {
 
     {
         let root = doc.root();
-        log(&format!("root: {root:#?}"))
+        log(&format!("first root: {root:#?}"))
     }
 
     {
-        let new_root = doc.make_map(Uuid::from_u128(0));
-        log(&format!("{new_root:#?}"));
-        log(&format!("{doc:#?}"));
+        let new_map = doc.make_map(Uuid::from_u128(0));
+        log(&format!("new map: {new_map:#?}"));
+        log(&format!("doc is now: {doc:#?}"));
     }
 
-    {
-        match doc.root() {
-            Some(document::Object::Map(map)) => {
-                log(&format!("got a map after insertion, as expected: {map:#?}"));
-            }
-            None => log("no map after insertion, contrary to expectations"),
-        }
-    }
+    log(&format!("new root: {:#?}", doc.root()));
 }
 
 #[wasm_bindgen]
