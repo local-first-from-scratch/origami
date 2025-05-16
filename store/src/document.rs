@@ -58,7 +58,14 @@ impl<Val: Ord> Document<Val> {
         id
     }
 
-    fn make_assign(&mut self, obj: Timestamp, key: &str, val: Timestamp, prev: BTreeSet<Timestamp>, node: Uuid) -> Timestamp {
+    fn make_assign(
+        &mut self,
+        obj: Timestamp,
+        key: &str,
+        val: Timestamp,
+        prev: BTreeSet<Timestamp>,
+        node: Uuid,
+    ) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
         self.operations.insert((
             id,
@@ -67,7 +74,7 @@ impl<Val: Ord> Document<Val> {
                 key: AssignKey::ObjectKey(key.to_string()),
                 val,
                 prev,
-            }
+            },
         ));
 
         id
