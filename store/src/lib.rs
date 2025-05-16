@@ -45,3 +45,22 @@ pub fn dry_run() {
         }
     }
 }
+
+#[wasm_bindgen]
+pub fn subscribe(document_id: js_sys::JsString, cb: &js_sys::Function) -> u64 {
+    // TODO: these are just roughed in for now
+    log(&format!("subscribing to {document_id} with {cb:#?}"));
+
+    log(&format!(
+        "{:#?}",
+        cb.call1(&JsValue::null(), &JsValue::from(1))
+    ));
+
+    0
+}
+
+#[wasm_bindgen]
+pub fn unsubscribe(subscription_id: u64) {
+    // TODO: these are just roughed in for now
+    log(&format!("dropped subscription {subscription_id}"))
+}

@@ -19,6 +19,7 @@ wasm-bindgen = { version = "0.2.84", features = ["strict-macro"] }
 # code size when deploying.
 console_error_panic_hook = { version = "0.1.7", optional = true }
 uuid = { version = "1.16.0", features = ["rng", "v4", "js"] }
+js-sys = "0.3.77"
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"
