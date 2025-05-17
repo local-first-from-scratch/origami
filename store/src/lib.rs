@@ -1,13 +1,11 @@
 mod document;
-mod operation;
 mod timestamp;
 mod utils;
 
 #[cfg(test)]
 mod test_helpers;
 
-use document::Document;
-use operation::AssignKey;
+use document::{AssignKey, Document};
 use std::collections::BTreeSet;
 use utils::set_panic_hook;
 use uuid::Uuid;
@@ -99,6 +97,7 @@ pub fn dry_run() {
     }
 
     log(&format!("new root: {:#?}", doc.root()));
+    log(&format!("new doc: {doc:#?}"));
 }
 
 #[wasm_bindgen]

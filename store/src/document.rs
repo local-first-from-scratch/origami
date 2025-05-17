@@ -1,5 +1,9 @@
-use crate::operation::{AssignKey, Operation};
+mod operation;
+
+pub use operation::AssignKey;
+
 use crate::timestamp::Timestamp;
+use operation::Operation;
 use std::collections::BTreeSet;
 use uuid::Uuid;
 
