@@ -1,3 +1,6 @@
+mod list;
+mod map;
+mod object;
 mod operation;
 
 pub use operation::AssignKey;
