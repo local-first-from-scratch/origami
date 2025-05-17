@@ -7,6 +7,8 @@ mod utils;
 mod test_helpers;
 
 use document::Document;
+use operation::AssignKey;
+use std::collections::BTreeSet;
 use utils::set_panic_hook;
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
@@ -21,7 +23,8 @@ extern "C" {
 pub fn dry_run() {
     set_panic_hook();
 
-    let mut doc: Document<()> = Document::new();
+    let mut doc: Document<&str> = Document::new();
+    let node = Uuid::from_u128(0);
 
     log(&format!("{doc:#?}"));
 
@@ -31,9 +34,68 @@ pub fn dry_run() {
     }
 
     {
-        let new_map = doc.make_map(Uuid::from_u128(0));
-        log(&format!("new map: {new_map:#?}"));
+        let map_id = doc.make_map(node);
+        log(&format!("new map: {map_id:#?}"));
         log(&format!("doc is now: {doc:#?}"));
+
+        let world_id = doc.make_val("World", node);
+        doc.assign(
+            map_id,
+            AssignKey::ObjectKey("hello".into()),
+            world_id,
+            BTreeSet::new(),
+            node,
+        );
+
+        let list_id = doc.make_list(node);
+        doc.assign(
+            map_id,
+            AssignKey::ObjectKey("list".into()),
+            world_id,
+            BTreeSet::new(),
+            node,
+        );
+
+        let item_1 = doc.insert_after(list_id, node);
+        doc.assign(
+            list_id,
+            AssignKey::InsertAfter(item_1),
+            world_id,
+            BTreeSet::new(),
+            node,
+        );
+
+        let item_2 = doc.insert_after(item_1, node);
+        doc.assign(
+            list_id,
+            AssignKey::InsertAfter(item_2),
+            world_id,
+            BTreeSet::new(),
+            node,
+        );
+
+        let item_3 = doc.insert_after(item_2, node);
+        doc.assign(
+            list_id,
+            AssignKey::InsertAfter(item_3),
+            world_id,
+            BTreeSet::new(),
+            node,
+        );
+
+        let to_remove_id = doc.assign(
+            map_id,
+            AssignKey::ObjectKey("mistake".into()),
+            world_id,
+            BTreeSet::new(),
+            node,
+        );
+        doc.remove(
+            map_id,
+            AssignKey::ObjectKey("mistake".into()),
+            BTreeSet::from([to_remove_id]),
+            node,
+        );
     }
 
     log(&format!("new root: {:#?}", doc.root()));

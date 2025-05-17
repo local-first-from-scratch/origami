@@ -41,17 +41,24 @@ impl<Val: Ord> Document<Val> {
         id
     }
 
-    fn make_val(&mut self, val: Val, node: Uuid) -> Timestamp {
+    pub fn make_val(&mut self, val: Val, node: Uuid) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
         self.operations.insert((id, Operation::MakeVal { val }));
 
         id
     }
 
-    fn make_assign(
+    pub fn make_list<'doc>(&'doc mut self, node: Uuid) -> Timestamp {
+        let id = Timestamp::new(self.next_timestamp_counter(), node);
+        self.operations.insert((id, Operation::MakeList));
+
+        id
+    }
+
+    pub fn assign(
         &mut self,
         obj: Timestamp,
-        key: &str,
+        key: AssignKey,
         val: Timestamp,
         prev: BTreeSet<Timestamp>,
         node: Uuid,
@@ -61,11 +68,33 @@ impl<Val: Ord> Document<Val> {
             id,
             Operation::Assign {
                 obj,
-                key: AssignKey::ObjectKey(key.to_string()),
+                key,
                 val,
                 prev,
             },
         ));
+
+        id
+    }
+
+    pub fn insert_after(&mut self, prev: Timestamp, node: Uuid) -> Timestamp {
+        let id = Timestamp::new(self.next_timestamp_counter(), node);
+        self.operations
+            .insert((id, Operation::InsertAfter { prev }));
+
+        id
+    }
+
+    pub fn remove(
+        &mut self,
+        obj: Timestamp,
+        key: AssignKey,
+        prev: BTreeSet<Timestamp>,
+        node: Uuid,
+    ) -> Timestamp {
+        let id = Timestamp::new(self.next_timestamp_counter(), node);
+        self.operations
+            .insert((id, Operation::Remove { obj, key, prev }));
 
         id
     }
