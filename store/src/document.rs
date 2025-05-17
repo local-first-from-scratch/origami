@@ -10,21 +10,23 @@ use uuid::Uuid;
 #[derive(Debug)]
 pub struct Document<Val: Ord> {
     operations: BTreeSet<(Timestamp, Operation<Val>)>,
+    highest_counter: u64,
 }
 
 impl<Val: Ord> Document<Val> {
     pub fn new() -> Self {
         Self {
             operations: BTreeSet::new(),
+            highest_counter: 0,
         }
     }
 
-    fn next_timestamp_counter(&self) -> u64 {
-        self.operations
-            .iter()
-            .max()
-            .map(|ts| ts.0.counter + 1)
-            .unwrap_or(0)
+    fn next_timestamp_counter(&mut self) -> u64 {
+        // note for later: we'll have to do a `max` between this and any
+        // incoming operations. The increment will be the same, though.
+        self.highest_counter += 1;
+
+        self.highest_counter
     }
 
     pub fn root<'doc>(&'doc mut self) -> Option<Timestamp> {
