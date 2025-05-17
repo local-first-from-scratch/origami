@@ -6,20 +6,22 @@ mod operation;
 pub use operation::AssignKey;
 
 use crate::timestamp::Timestamp;
-use operation::Operation;
-use std::collections::BTreeSet;
+use list::List;
+use map::Map;
+use object::Object;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 #[derive(Debug)]
 pub struct Document<Val: Ord> {
-    operations: BTreeSet<(Timestamp, Operation<Val>)>,
+    objects: HashMap<Timestamp, Object<Val>>,
     highest_counter: u64,
 }
 
 impl<Val: Ord> Document<Val> {
     pub fn new() -> Self {
         Self {
-            operations: BTreeSet::new(),
+            objects: HashMap::new(),
             highest_counter: 0,
         }
     }
@@ -32,64 +34,67 @@ impl<Val: Ord> Document<Val> {
         self.highest_counter
     }
 
-    pub fn root<'doc>(&'doc mut self) -> Option<Timestamp> {
-        for (id, op) in &self.operations {
-            match op {
-                Operation::MakeMap | Operation::MakeList => return Some(*id),
-                _ => continue,
-            }
-        }
-
-        None
+    pub fn root(&mut self) -> Option<Timestamp> {
+        self.objects.keys().min().copied()
     }
 
-    pub fn make_map<'doc>(&'doc mut self, node: Uuid) -> Timestamp {
+    pub fn make_map(&mut self, node: Uuid) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
-        self.operations.insert((id, Operation::MakeMap));
+
+        // TODO: handle key collision
+        self.objects.insert(id, Object::Map(Map::new(id)));
 
         id
     }
 
     pub fn make_val(&mut self, val: Val, node: Uuid) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
-        self.operations.insert((id, Operation::MakeVal { val }));
+
+        // TODO: handle key collision
+        self.objects.insert(id, Object::Val(id, val));
 
         id
     }
 
-    pub fn make_list<'doc>(&'doc mut self, node: Uuid) -> Timestamp {
+    pub fn make_list(&mut self, node: Uuid) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
-        self.operations.insert((id, Operation::MakeList));
+
+        // TODO: handle key collision
+        self.objects.insert(id, Object::List(List::new(id)));
 
         id
     }
 
     pub fn assign(
         &mut self,
-        obj: Timestamp,
-        key: AssignKey,
-        val: Timestamp,
-        prev: BTreeSet<Timestamp>,
+        _obj: Timestamp,
+        _key: AssignKey,
+        _val: Timestamp,
+        _prev: HashSet<Timestamp>,
         node: Uuid,
     ) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
-        self.operations.insert((
-            id,
-            Operation::Assign {
-                obj,
-                key,
-                val,
-                prev,
-            },
-        ));
+
+        // TODO: look up key, insert into map or list, fail on val or missing key
+        // self.operations.insert((
+        //     id,
+        //     Operation::Assign {
+        //         obj,
+        //         key,
+        //         val,
+        //         prev,
+        //     },
+        // ));
 
         id
     }
 
-    pub fn insert_after(&mut self, prev: Timestamp, node: Uuid) -> Timestamp {
+    pub fn insert_after(&mut self, _prev: Timestamp, node: Uuid) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
-        self.operations
-            .insert((id, Operation::InsertAfter { prev }));
+
+        // TODO: look up key, insert into list, fail on map, val, or missing key
+        // self.operations
+        //     .insert((id, Operation::InsertAfter { prev }));
 
         id
     }
@@ -98,12 +103,14 @@ impl<Val: Ord> Document<Val> {
         &mut self,
         obj: Timestamp,
         key: AssignKey,
-        prev: BTreeSet<Timestamp>,
+        prev: HashSet<Timestamp>,
         node: Uuid,
     ) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
-        self.operations
-            .insert((id, Operation::Remove { obj, key, prev }));
+
+        // TODO: look up key, insert into map or list, fail on val or missing key
+        // self.operations
+        //     .insert((id, Operation::Remove { obj, key, prev }));
 
         id
     }

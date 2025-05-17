@@ -6,7 +6,7 @@ mod utils;
 mod test_helpers;
 
 use document::{AssignKey, Document};
-use std::collections::BTreeSet;
+use std::collections::HashSet;
 use utils::set_panic_hook;
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
@@ -41,7 +41,7 @@ pub fn dry_run() {
             map_id,
             AssignKey::ObjectKey("hello".into()),
             world_id,
-            BTreeSet::new(),
+            HashSet::new(),
             node,
         );
 
@@ -50,7 +50,7 @@ pub fn dry_run() {
             map_id,
             AssignKey::ObjectKey("list".into()),
             world_id,
-            BTreeSet::new(),
+            HashSet::new(),
             node,
         );
 
@@ -59,7 +59,7 @@ pub fn dry_run() {
             list_id,
             AssignKey::InsertAfter(item_1),
             world_id,
-            BTreeSet::new(),
+            HashSet::new(),
             node,
         );
 
@@ -68,7 +68,7 @@ pub fn dry_run() {
             list_id,
             AssignKey::InsertAfter(item_2),
             world_id,
-            BTreeSet::new(),
+            HashSet::new(),
             node,
         );
 
@@ -77,7 +77,7 @@ pub fn dry_run() {
             list_id,
             AssignKey::InsertAfter(item_3),
             world_id,
-            BTreeSet::new(),
+            HashSet::new(),
             node,
         );
 
@@ -85,13 +85,13 @@ pub fn dry_run() {
             map_id,
             AssignKey::ObjectKey("mistake".into()),
             world_id,
-            BTreeSet::new(),
+            HashSet::new(),
             node,
         );
         doc.remove(
             map_id,
             AssignKey::ObjectKey("mistake".into()),
-            BTreeSet::from([to_remove_id]),
+            HashSet::from([to_remove_id]),
             node,
         );
     }
