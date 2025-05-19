@@ -4,12 +4,14 @@ mod object;
 mod operation;
 
 pub use operation::AssignKey;
+use wasm_bindgen::JsValue;
 
 use crate::timestamp::Timestamp;
 use list::List;
 use map::Map;
 use object::Object;
 use std::collections::{HashMap, HashSet};
+use thiserror::Error;
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -79,26 +81,20 @@ impl<Val: Ord> Document<Val> {
 
     pub fn assign(
         &mut self,
-        _obj: Timestamp,
-        _key: AssignKey,
-        _val: Timestamp,
-        _prev: HashSet<Timestamp>,
+        obj: Timestamp,
+        key: AssignKey,
+        val: Timestamp,
+        prev: HashSet<Timestamp>,
         node: Uuid,
-    ) -> Timestamp {
+    ) -> Result<Timestamp, AssignError> {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
 
-        // TODO: look up key, insert into map or list, fail on val or missing key
-        // self.operations.insert((
-        //     id,
-        //     Operation::Assign {
-        //         obj,
-        //         key,
-        //         val,
-        //         prev,
-        //     },
-        // ));
-
-        id
+        match self.objects.get_mut(&obj) {
+            None => Err(AssignError::KeyNotFound),
+            Some(Object::Val(..)) => Err(AssignError::ObjectWasVal),
+            Some(Object::List(list)) => todo!("list"),
+            Some(Object::Map(map)) => todo!("map"),
+        }
     }
 
     pub fn insert_after(&mut self, _prev: Timestamp, node: Uuid) -> Timestamp {
@@ -113,9 +109,9 @@ impl<Val: Ord> Document<Val> {
 
     pub fn remove(
         &mut self,
-        obj: Timestamp,
-        key: AssignKey,
-        prev: HashSet<Timestamp>,
+        _obj: Timestamp,
+        _key: AssignKey,
+        _prev: HashSet<Timestamp>,
         node: Uuid,
     ) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
@@ -125,6 +121,20 @@ impl<Val: Ord> Document<Val> {
         //     .insert((id, Operation::Remove { obj, key, prev }));
 
         id
+    }
+}
+
+#[derive(Error, Debug, PartialEq)]
+pub enum AssignError {
+    #[error("Object not found")]
+    KeyNotFound,
+    #[error("Object was found, but was a val. Only maps and lists can have assignments.")]
+    ObjectWasVal,
+}
+
+impl Into<JsValue> for AssignError {
+    fn into(self) -> JsValue {
+        JsValue::from_str(&self.to_string())
     }
 }
 
@@ -185,5 +195,53 @@ mod test {
             }
             _ => panic!("Expected Val object for timestamp {}", val_id),
         }
+    }
+
+    #[test]
+    fn assign_to_non_existent_object_gives_key_not_found() {
+        let mut doc = Document::<i32>::new();
+        let node_id = Uuid::new_v4();
+
+        // Create a timestamp that doesn't exist in the document
+        let non_existent_id = Timestamp::new(999, node_id);
+
+        // Create a value to assign
+        let val_id = doc.make_val(42, node_id);
+
+        // Try to assign the value to a non-existent object
+        let result = doc.assign(
+            non_existent_id,
+            AssignKey::ObjectKey("key".to_string()),
+            val_id,
+            HashSet::new(),
+            node_id,
+        );
+
+        // Check that we get the KeyNotFound error
+        assert_eq!(result, Err(AssignError::KeyNotFound));
+    }
+
+    #[test]
+    fn assign_to_val_object_gives_object_was_val() {
+        let mut doc = Document::<i32>::new();
+        let node_id = Uuid::new_v4();
+
+        // Create a value object
+        let val_id = doc.make_val(42, node_id);
+
+        // Create another value to assign
+        let another_val_id = doc.make_val(99, node_id);
+
+        // Try to assign the second value to the first value (which should fail because we can only assign to maps or lists)
+        let result = doc.assign(
+            val_id,
+            AssignKey::ObjectKey("key".to_string()),
+            another_val_id,
+            HashSet::new(),
+            node_id,
+        );
+
+        // Check that we get the ObjectWasVal error
+        assert_eq!(result, Err(AssignError::ObjectWasVal));
     }
 }

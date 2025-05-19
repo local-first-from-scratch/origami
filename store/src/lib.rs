@@ -5,7 +5,7 @@ mod utils;
 #[cfg(test)]
 mod test_helpers;
 
-use document::{AssignKey, Document};
+use document::{AssignError, AssignKey, Document};
 use std::collections::HashSet;
 use utils::set_panic_hook;
 use uuid::Uuid;
@@ -18,7 +18,7 @@ extern "C" {
 }
 
 #[wasm_bindgen]
-pub fn dry_run() {
+pub fn dry_run() -> Result<(), AssignError> {
     set_panic_hook();
 
     let mut doc: Document<&str> = Document::new();
@@ -43,7 +43,7 @@ pub fn dry_run() {
             world_id,
             HashSet::new(),
             node,
-        );
+        )?;
 
         let list_id = doc.make_list(node);
         doc.assign(
@@ -52,7 +52,7 @@ pub fn dry_run() {
             world_id,
             HashSet::new(),
             node,
-        );
+        )?;
 
         let item_1 = doc.insert_after(list_id, node);
         doc.assign(
@@ -61,7 +61,7 @@ pub fn dry_run() {
             world_id,
             HashSet::new(),
             node,
-        );
+        )?;
 
         let item_2 = doc.insert_after(item_1, node);
         doc.assign(
@@ -70,7 +70,7 @@ pub fn dry_run() {
             world_id,
             HashSet::new(),
             node,
-        );
+        )?;
 
         let item_3 = doc.insert_after(item_2, node);
         doc.assign(
@@ -79,7 +79,7 @@ pub fn dry_run() {
             world_id,
             HashSet::new(),
             node,
-        );
+        )?;
 
         let to_remove_id = doc.assign(
             map_id,
@@ -87,7 +87,7 @@ pub fn dry_run() {
             world_id,
             HashSet::new(),
             node,
-        );
+        )?;
         doc.remove(
             map_id,
             AssignKey::ObjectKey("mistake".into()),
@@ -98,6 +98,8 @@ pub fn dry_run() {
 
     log(&format!("new root: {:#?}", doc.root()));
     log(&format!("new doc: {doc:#?}"));
+
+    Ok(())
 }
 
 #[wasm_bindgen]
