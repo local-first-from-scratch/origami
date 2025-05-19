@@ -1,3 +1,4 @@
+mod assign;
 mod list;
 mod map;
 mod object;

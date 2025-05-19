@@ -25,7 +25,7 @@ pub enum Operation<Val> {
     },
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 #[repr(C)]
 pub enum AssignKey {
     // TODO: numeric keys as well?
