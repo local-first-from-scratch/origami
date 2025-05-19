@@ -29,6 +29,6 @@ pub enum Operation<Val> {
 #[repr(C)]
 pub enum AssignKey {
     // TODO: numeric keys as well?
-    ObjectKey(String),
+    MapKey(String),
     InsertAfter(Timestamp),
 }

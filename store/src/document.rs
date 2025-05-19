@@ -10,7 +10,7 @@ use crate::timestamp::Timestamp;
 use list::List;
 use map::Map;
 use object::Object;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -48,7 +48,8 @@ impl<Val: Ord> Document<Val> {
             "document already contains {id}"
         );
 
-        self.objects.insert(id, Object::Map(Map::new(id)));
+        self.objects
+            .insert(id, Object::Map(Map::new_from_root_id(id)));
 
         id
     }
@@ -84,7 +85,7 @@ impl<Val: Ord> Document<Val> {
         obj: Timestamp,
         key: AssignKey,
         val: Timestamp,
-        prev: HashSet<Timestamp>,
+        prev: BTreeSet<Timestamp>,
         node: Uuid,
     ) -> Result<Timestamp, AssignError> {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
@@ -92,8 +93,15 @@ impl<Val: Ord> Document<Val> {
         match self.objects.get_mut(&obj) {
             None => Err(AssignError::KeyNotFound),
             Some(Object::Val(..)) => Err(AssignError::ObjectWasVal),
+            Some(Object::Map(map)) => {
+                if !matches!(key, AssignKey::MapKey(..)) {
+                    Err(AssignError::ExpectedMapKey)
+                } else {
+                    map.assign(id, obj, key, val, prev);
+                    Ok(id)
+                }
+            }
             Some(Object::List(list)) => todo!("list"),
-            Some(Object::Map(map)) => todo!("map"),
         }
     }
 
@@ -111,7 +119,7 @@ impl<Val: Ord> Document<Val> {
         &mut self,
         _obj: Timestamp,
         _key: AssignKey,
-        _prev: HashSet<Timestamp>,
+        _prev: BTreeSet<Timestamp>,
         node: Uuid,
     ) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
@@ -126,10 +134,12 @@ impl<Val: Ord> Document<Val> {
 
 #[derive(Error, Debug, PartialEq)]
 pub enum AssignError {
-    #[error("Object not found")]
+    #[error("Object not found.")]
     KeyNotFound,
     #[error("Object was found, but was a val. Only maps and lists can have assignments.")]
     ObjectWasVal,
+    #[error("Expected a map key, but got an insert after.")]
+    ExpectedMapKey,
 }
 
 impl Into<JsValue> for AssignError {
@@ -211,9 +221,9 @@ mod test {
         // Try to assign the value to a non-existent object
         let result = doc.assign(
             non_existent_id,
-            AssignKey::ObjectKey("key".to_string()),
+            AssignKey::MapKey("key".to_string()),
             val_id,
-            HashSet::new(),
+            BTreeSet::new(),
             node_id,
         );
 
@@ -235,13 +245,40 @@ mod test {
         // Try to assign the second value to the first value (which should fail because we can only assign to maps or lists)
         let result = doc.assign(
             val_id,
-            AssignKey::ObjectKey("key".to_string()),
+            AssignKey::MapKey("key".to_string()),
             another_val_id,
-            HashSet::new(),
+            BTreeSet::new(),
             node_id,
         );
 
         // Check that we get the ObjectWasVal error
         assert_eq!(result, Err(AssignError::ObjectWasVal));
+    }
+
+    #[test]
+    fn assign_to_map_with_insert_after_gives_expected_map_key() {
+        let mut doc = Document::<i32>::new();
+        let node_id = Uuid::new_v4();
+
+        // Create a map
+        let map_id = doc.make_map(node_id);
+
+        // Create a value to assign
+        let val_id = doc.make_val(42, node_id);
+
+        // Create another timestamp to use as the "prev" in the InsertAfter
+        let prev_id = doc.make_val(99, node_id);
+
+        // Try to assign to the map using InsertAfter instead of MapKey
+        let result = doc.assign(
+            map_id,
+            AssignKey::InsertAfter(prev_id),
+            val_id,
+            BTreeSet::new(),
+            node_id,
+        );
+
+        // Check that we get the ExpectedMapKey error
+        assert_eq!(result, Err(AssignError::ExpectedMapKey));
     }
 }

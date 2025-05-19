@@ -6,7 +6,7 @@ mod utils;
 mod test_helpers;
 
 use document::{AssignError, AssignKey, Document};
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use utils::set_panic_hook;
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
@@ -39,18 +39,18 @@ pub fn dry_run() -> Result<(), AssignError> {
         let world_id = doc.make_val("World", node);
         doc.assign(
             map_id,
-            AssignKey::ObjectKey("hello".into()),
+            AssignKey::MapKey("hello".into()),
             world_id,
-            HashSet::new(),
+            BTreeSet::new(),
             node,
         )?;
 
         let list_id = doc.make_list(node);
         doc.assign(
             map_id,
-            AssignKey::ObjectKey("list".into()),
+            AssignKey::MapKey("list".into()),
             world_id,
-            HashSet::new(),
+            BTreeSet::new(),
             node,
         )?;
 
@@ -59,7 +59,7 @@ pub fn dry_run() -> Result<(), AssignError> {
             list_id,
             AssignKey::InsertAfter(item_1),
             world_id,
-            HashSet::new(),
+            BTreeSet::new(),
             node,
         )?;
 
@@ -68,7 +68,7 @@ pub fn dry_run() -> Result<(), AssignError> {
             list_id,
             AssignKey::InsertAfter(item_2),
             world_id,
-            HashSet::new(),
+            BTreeSet::new(),
             node,
         )?;
 
@@ -77,21 +77,21 @@ pub fn dry_run() -> Result<(), AssignError> {
             list_id,
             AssignKey::InsertAfter(item_3),
             world_id,
-            HashSet::new(),
+            BTreeSet::new(),
             node,
         )?;
 
         let to_remove_id = doc.assign(
             map_id,
-            AssignKey::ObjectKey("mistake".into()),
+            AssignKey::MapKey("mistake".into()),
             world_id,
-            HashSet::new(),
+            BTreeSet::new(),
             node,
         )?;
         doc.remove(
             map_id,
-            AssignKey::ObjectKey("mistake".into()),
-            HashSet::from([to_remove_id]),
+            AssignKey::MapKey("mistake".into()),
+            BTreeSet::from([to_remove_id]),
             node,
         );
     }
