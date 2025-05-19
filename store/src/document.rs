@@ -127,3 +127,63 @@ impl<Val: Ord> Document<Val> {
         id
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn make_map_gives_timestamp_for_map() {
+        let mut doc = Document::<i32>::new();
+        let node_id = Uuid::new_v4();
+
+        let map_id = doc.make_map(node_id);
+
+        // The timestamp should now exist in the document
+        assert!(doc.objects.contains_key(&map_id));
+
+        // The object should be a Map
+        match &doc.objects[&map_id] {
+            Object::Map(_) => {}
+            _ => panic!("Expected Map object for timestamp {}", map_id),
+        }
+    }
+
+    #[test]
+    fn make_list_gives_timestamp_for_list() {
+        let mut doc = Document::<i32>::new();
+        let node_id = Uuid::new_v4();
+
+        let list_id = doc.make_list(node_id);
+
+        // The timestamp should now exist in the document
+        assert!(doc.objects.contains_key(&list_id));
+
+        // The object should be a List
+        match &doc.objects[&list_id] {
+            Object::List(_) => {}
+            _ => panic!("Expected List object for timestamp {}", list_id),
+        }
+    }
+
+    #[test]
+    fn make_val_gives_timestamp_for_val() {
+        let mut doc = Document::<i32>::new();
+        let node_id = Uuid::new_v4();
+        let value = 42;
+
+        let val_id = doc.make_val(value, node_id);
+
+        // The timestamp should now exist in the document
+        assert!(doc.objects.contains_key(&val_id));
+
+        // The object should be the correct value
+        match &doc.objects[&val_id] {
+            Object::Val(_, v) => {
+                assert_eq!(*v, value);
+            }
+            _ => panic!("Expected Val object for timestamp {}", val_id),
+        }
+    }
+}
