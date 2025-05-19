@@ -41,7 +41,11 @@ impl<Val: Ord> Document<Val> {
     pub fn make_map(&mut self, node: Uuid) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
 
-        // TODO: handle key collision
+        debug_assert!(
+            !self.objects.contains_key(&id),
+            "document already contains {id}"
+        );
+
         self.objects.insert(id, Object::Map(Map::new(id)));
 
         id
@@ -50,7 +54,11 @@ impl<Val: Ord> Document<Val> {
     pub fn make_val(&mut self, val: Val, node: Uuid) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
 
-        // TODO: handle key collision
+        debug_assert!(
+            !self.objects.contains_key(&id),
+            "document already contains {id}"
+        );
+
         self.objects.insert(id, Object::Val(id, val));
 
         id
@@ -59,7 +67,11 @@ impl<Val: Ord> Document<Val> {
     pub fn make_list(&mut self, node: Uuid) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
 
-        // TODO: handle key collision
+        debug_assert!(
+            !self.objects.contains_key(&id),
+            "document already contains {id}"
+        );
+
         self.objects.insert(id, Object::List(List::new(id)));
 
         id
