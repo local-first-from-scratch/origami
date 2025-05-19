@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -11,6 +13,12 @@ pub struct Timestamp {
 impl Timestamp {
     pub fn new(counter: u64, node: Uuid) -> Self {
         Self { counter, node }
+    }
+}
+
+impl Display for Timestamp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}@{}", self.counter, self.node)
     }
 }
 
@@ -29,5 +37,12 @@ mod test {
                 assert_eq!(a.node.cmp(&b.node), a.cmp(&b));
             }
         }
+    }
+
+    #[test]
+    fn display_includes_counter_and_timestamp() {
+        let ts = Timestamp::new(0, Uuid::nil());
+
+        assert_eq!(ts.to_string(), "0@00000000-0000-0000-0000-000000000000")
     }
 }
