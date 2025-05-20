@@ -1,16 +1,16 @@
+use super::operation::Operation;
 use crate::timestamp::Timestamp;
+use std::collections::BTreeSet;
 
 #[derive(Debug)]
-pub struct List {
-    // TODO: not happy with this at the moment. It seems like it's going to make
-    // it harder to retrieve all the operations if we have to special-case
-    // things like this. Might still be marginally better than storing all the
-    // operations twice, though?
-    make_list_ts: Timestamp,
+pub struct List<Val: Ord> {
+    ops: BTreeSet<(Timestamp, Operation<Val>)>,
 }
 
-impl List {
-    pub fn new(make_list_ts: Timestamp) -> Self {
-        Self { make_list_ts }
+impl<Val: Ord> List<Val> {
+    pub fn new_from_root_id(root_id: Timestamp) -> Self {
+        Self {
+            ops: BTreeSet::from([(root_id, Operation::MakeList)]),
+        }
     }
 }

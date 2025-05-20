@@ -5,6 +5,6 @@ use crate::timestamp::Timestamp;
 #[derive(Debug)]
 pub enum Object<Val: Ord> {
     Map(Map<Val>),
-    List(List),
+    List(List<Val>),
     Val(Timestamp, Val),
 }

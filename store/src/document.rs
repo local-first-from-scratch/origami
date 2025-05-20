@@ -11,7 +11,7 @@ use crate::timestamp::Timestamp;
 use list::List;
 use map::Map;
 use object::Object;
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -76,7 +76,8 @@ impl<Val: Ord> Document<Val> {
             "document already contains {id}"
         );
 
-        self.objects.insert(id, Object::List(List::new(id)));
+        self.objects
+            .insert(id, Object::List(List::new_from_root_id(id)));
 
         id
     }
