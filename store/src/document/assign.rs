@@ -27,6 +27,10 @@ impl Assign {
         }
         entry.insert(id, val);
     }
+
+    pub fn get(&self, key: &AssignKey) -> Option<&BTreeMap<Timestamp, Timestamp>> where {
+        self.values.get(key)
+    }
 }
 
 #[cfg(test)]
