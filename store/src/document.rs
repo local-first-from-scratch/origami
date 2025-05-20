@@ -3,6 +3,7 @@ mod list;
 mod map;
 mod object;
 mod operation;
+mod order;
 
 pub use operation::AssignKey;
 use wasm_bindgen::JsValue;
