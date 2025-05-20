@@ -103,7 +103,14 @@ impl<Val: Ord> Document<Val> {
                     Ok(id)
                 }
             }
-            Some(Object::List(list)) => todo!("list"),
+            Some(Object::List(list)) => {
+                if !matches!(key, AssignKey::InsertAfter(..)) {
+                    Err(AssignError::ExpectedInsertAfter)
+                } else {
+                    list.assign(id, obj, key, val, prev);
+                    Ok(id)
+                }
+            }
         }
     }
 
@@ -142,6 +149,8 @@ pub enum AssignError {
     ObjectWasVal,
     #[error("Expected a map key, but got an insert after.")]
     ExpectedMapKey,
+    #[error("Expected an insert after, but got a map key.")]
+    ExpectedInsertAfter,
 }
 
 impl Into<JsValue> for AssignError {
@@ -282,5 +291,29 @@ mod test {
 
         // Check that we get the ExpectedMapKey error
         assert_eq!(result, Err(AssignError::ExpectedMapKey));
+    }
+
+    #[test]
+    fn assign_to_list_with_map_key_gives_expected_insert_after() {
+        let mut doc = Document::<i32>::new();
+        let node_id = Uuid::new_v4();
+
+        // Create a list
+        let map_id = doc.make_list(node_id);
+
+        // Create a value to assign
+        let val_id = doc.make_val(42, node_id);
+
+        // Try to assign to the map using InsertAfter instead of MapKey
+        let result = doc.assign(
+            map_id,
+            AssignKey::MapKey("hello".into()),
+            val_id,
+            BTreeSet::new(),
+            node_id,
+        );
+
+        // Check that we get the ExpectedMapKey error
+        assert_eq!(result, Err(AssignError::ExpectedInsertAfter));
     }
 }
