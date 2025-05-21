@@ -1,29 +1,53 @@
 use crate::timestamp::Timestamp;
+use std::collections::BTreeMap;
 
 #[derive(Debug)]
 pub struct Order {
-    root_id: Timestamp,
-    values: Vec<Timestamp>,
+    ordering: BTreeMap<Timestamp, Timestamp>,
 }
 
 impl Order {
-    pub fn new(root_id: Timestamp) -> Self {
+    pub fn new() -> Self {
         Self {
-            root_id,
-            values: Vec::new(),
+            ordering: BTreeMap::new(),
         }
     }
 
     pub fn insert_after(&mut self, op_id: Timestamp, after: Timestamp) {
-        if after == self.root_id {
-            self.values.insert(0, op_id);
-        } else {
-            for (i, value) in self.values.iter().enumerate() {
-                if value == &after {
-                    self.values.insert(i + 1, op_id);
-                    break;
-                }
-            }
+        if let Some(previous) = self.ordering.insert(after, op_id) {
+            self.ordering.insert(op_id, previous);
+        }
+    }
+
+    pub fn iter<'o>(&'o self, start: &'o Timestamp) -> OrderIterator<'o> {
+        OrderIterator::new(self, start)
+    }
+}
+
+#[derive(Debug)]
+pub struct OrderIterator<'o> {
+    order: &'o Order,
+    current: Option<&'o Timestamp>,
+}
+
+impl<'o> OrderIterator<'o> {
+    pub fn new(order: &'o Order, start: &'o Timestamp) -> Self {
+        Self {
+            order,
+            // We don't want to iterate over the start of the list; it's the
+            // Timestamp of a `MakeList` operation, not an actual list item.
+            current: order.ordering.get(start),
+        }
+    }
+}
+
+impl<'o> Iterator for OrderIterator<'o> {
+    type Item = &'o Timestamp;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.current.and_then(|c| self.order.ordering.get(c)) {
+            Some(next) => self.current.replace(next),
+            None => self.current.take(),
         }
     }
 }
@@ -32,53 +56,40 @@ impl Order {
 mod test {
     use super::*;
     use pretty_assertions::assert_eq;
-    use uuid::Uuid;
+    use proptest::{prop_assume, proptest};
 
-    #[test]
-    fn new_is_empty() {
-        let root_id = Timestamp::new(0, Uuid::nil());
-        let order = Order::new(root_id);
+    proptest! {
+        // In non-byzantine circumstances, we should move timestamps around so
+        // that we have a single chains with neither branching nor joining. "No
+        // branching" is guaranteed by our data structure (we cannot have an
+        // entry with two values), but joining is not ruled out because you can
+        // have multiple keys pointing at the same value. Well, let's test to
+        // rule that out!
+        #[test]
+        fn insert_after_never_has_duplicate_values(values: Vec<Timestamp>) {
+            let mut order = Order::new();
+            values.windows(2).for_each(|window| order.insert_after(window[1], window[0]));
 
-        assert_eq!(order.root_id, root_id);
-        assert!(order.values.is_empty());
+            let mut count: BTreeMap<Timestamp, usize> = BTreeMap::new();
+            for v in order.ordering.values() {
+                *count.entry(*v).or_default() += 1
+            }
+
+            for (k, v) in count {
+                assert_eq!(v, 1, "{k} had multiple incoming pointers. Full data structure: {order:#?}")
+            }
+        }
     }
 
-    #[test]
-    fn insert_after_root_id() {
-        let root_id = Timestamp::new(0, Uuid::nil());
-        let mut order = Order::new(root_id);
+    proptest! {
+        #[test]
+        fn iteration_retains_ordering(values: Vec<Timestamp>) {
+            prop_assume!(values.len() > 0);
 
-        let op_id = Timestamp::new(1, Uuid::nil());
-        order.insert_after(op_id, root_id);
+            let mut order = Order::new();
+            values.windows(2).for_each(|window| order.insert_after(window[1], window[0]));
 
-        assert_eq!(order.values, vec![op_id]);
-    }
-
-    #[test]
-    fn insert_after_other_item() {
-        let root_id = Timestamp::new(0, Uuid::nil());
-        let mut order = Order::new(root_id);
-
-        let op_a = Timestamp::new(1, Uuid::nil());
-        order.insert_after(op_a, root_id);
-
-        let op_b = Timestamp::new(2, Uuid::nil());
-        order.insert_after(op_b, op_a);
-
-        assert_eq!(order.values, vec![op_a, op_b]);
-    }
-
-    #[test]
-    fn insert_after_not_present() {
-        let root_id = Timestamp::new(0, Uuid::nil());
-        let mut order = Order::new(root_id);
-
-        order.insert_after(
-            Timestamp::new(1, Uuid::nil()),
-            // This ID doesn't exist in the ordering!
-            Timestamp::new(2, Uuid::nil()),
-        );
-
-        assert_eq!(order.values, vec![]);
+            assert_eq!(values[1..], order.iter(&values[0]).copied().collect::<Vec<Timestamp>>())
+        }
     }
 }
