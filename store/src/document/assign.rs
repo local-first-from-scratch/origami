@@ -2,7 +2,7 @@ use super::AssignKey;
 use crate::timestamp::Timestamp;
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Assign {
     values: BTreeMap<AssignKey, BTreeMap<Timestamp, Timestamp>>,
 }

@@ -1,9 +1,9 @@
 use crate::timestamp::Timestamp;
 use std::collections::BTreeSet;
 
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
 #[repr(C)]
-pub enum Operation<Val> {
+pub enum Operation<Val: Clone> {
     MakeMap,
     MakeList,
     MakeVal {
