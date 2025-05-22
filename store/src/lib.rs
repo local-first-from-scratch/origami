@@ -50,7 +50,7 @@ pub fn dry_run() {
         doc.assign(
             map_id,
             AssignKey::MapKey("list".into()),
-            world_id,
+            list_id,
             BTreeSet::new(),
             node,
         );
