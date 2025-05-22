@@ -1,5 +1,4 @@
 mod document;
-mod fugue;
 mod timestamp;
 mod utils;
 
