@@ -21,7 +21,7 @@ extern "C" {
 pub fn dry_run() {
     set_panic_hook();
 
-    let mut doc: Document<&str> = Document::new();
+    let mut doc: Document = Document::new();
     let node = Uuid::from_u128(0);
 
     log(&format!("{doc:#?}"));
@@ -36,7 +36,7 @@ pub fn dry_run() {
         log(&format!("new map: {map_id:#?}"));
         log(&format!("doc is now: {doc:#?}"));
 
-        let world_id = doc.make_val("World", node);
+        let world_id = doc.make_val("World".into(), node);
         doc.assign(
             map_id,
             AssignKey::MapKey("hello".into()),

@@ -1,6 +1,7 @@
 mod assign;
 mod operation;
 mod order;
+mod value;
 
 use crate::timestamp::Timestamp;
 use assign::Assign;
@@ -9,22 +10,23 @@ use operation::Operation;
 use order::Order;
 use std::collections::{BTreeMap, BTreeSet};
 use uuid::Uuid;
+use value::Value;
 
 #[derive(Debug)]
-pub struct Document<Val: Ord + Clone> {
-    operations: BTreeSet<(Timestamp, Operation<Val>)>,
+pub struct Document {
+    operations: Vec<(Timestamp, Operation)>,
 
     ordering: Order,
     assignment: BTreeMap<Timestamp, Assign>,
-    values: BTreeMap<Timestamp, Val>,
+    values: BTreeMap<Timestamp, Value>,
 
     highest_counter: u64,
 }
 
-impl<Val: Ord + Clone> Document<Val> {
+impl Document {
     pub fn new() -> Self {
         Self {
-            operations: BTreeSet::new(),
+            operations: Vec::new(),
 
             ordering: Order::new(),
             assignment: BTreeMap::new(),
@@ -52,7 +54,7 @@ impl<Val: Ord + Clone> Document<Val> {
         None
     }
 
-    fn apply(&mut self, id: Timestamp, operation: &Operation<Val>) {
+    fn apply(&mut self, id: Timestamp, operation: &Operation) {
         match operation {
             Operation::MakeMap | Operation::MakeList => {
                 debug_assert!(
@@ -101,7 +103,7 @@ impl<Val: Ord + Clone> Document<Val> {
         let op = Operation::MakeMap;
 
         self.apply(id, &op);
-        self.operations.insert((id, op));
+        self.operations.push((id, op));
 
         id
     }
@@ -111,17 +113,17 @@ impl<Val: Ord + Clone> Document<Val> {
         let op = Operation::MakeList;
 
         self.apply(id, &op);
-        self.operations.insert((id, op));
+        self.operations.push((id, op));
 
         id
     }
 
-    pub fn make_val(&mut self, val: Val, node: Uuid) -> Timestamp {
+    pub fn make_val(&mut self, val: Value, node: Uuid) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
         let op = Operation::MakeVal { val };
 
         self.apply(id, &op);
-        self.operations.insert((id, op));
+        self.operations.push((id, op));
 
         id
     }
@@ -143,7 +145,7 @@ impl<Val: Ord + Clone> Document<Val> {
         };
 
         self.apply(id, &op);
-        self.operations.insert((id, op));
+        self.operations.push((id, op));
 
         id
     }
@@ -153,7 +155,7 @@ impl<Val: Ord + Clone> Document<Val> {
         let op = Operation::InsertAfter { prev };
 
         self.apply(id, &op);
-        self.operations.insert((id, op));
+        self.operations.push((id, op));
 
         id
     }
@@ -169,7 +171,7 @@ impl<Val: Ord + Clone> Document<Val> {
         let op = Operation::Remove { obj, key, prev };
 
         self.apply(id, &op);
-        self.operations.insert((id, op));
+        self.operations.push((id, op));
 
         id
     }
@@ -182,7 +184,7 @@ mod test {
 
     #[test]
     fn make_map_gives_timestamp_for_map() {
-        let mut doc = Document::<i32>::new();
+        let mut doc = Document::new();
         let node_id = Uuid::new_v4();
 
         let map_id = doc.make_map(node_id);
@@ -193,7 +195,7 @@ mod test {
 
     #[test]
     fn make_list_gives_timestamp_for_list() {
-        let mut doc = Document::<i32>::new();
+        let mut doc = Document::new();
         let node_id = Uuid::new_v4();
 
         let list_id = doc.make_list(node_id);
@@ -204,11 +206,11 @@ mod test {
 
     #[test]
     fn make_val_gives_timestamp_for_val() {
-        let mut doc = Document::<i32>::new();
+        let mut doc = Document::new();
         let node_id = Uuid::new_v4();
-        let value = 0;
+        let value = Value::from(0);
 
-        let val_id = doc.make_val(value, node_id);
+        let val_id = doc.make_val(value.clone(), node_id);
 
         // The timestamp should now exist in the document
         assert_eq!(doc.values.get(&val_id), Some(&value));
@@ -221,14 +223,14 @@ mod test {
         // see arguments both directions. On one hand, we want to be resistant
         // to buggy behavior. On the other hand, once an operation has been
         // accepted we need to acknowledge and deal with it.
-        let mut doc = Document::<i32>::new();
+        let mut doc = Document::new();
         let node_id = Uuid::new_v4();
 
         // Create a timestamp that doesn't exist in the document
         let non_existent_id = Timestamp::new(999, node_id);
 
         // Create a value to assign
-        let val_id = doc.make_val(0, node_id);
+        let val_id = doc.make_val(0.into(), node_id);
 
         // Try to assign the value to a non-existent object
         doc.assign(
@@ -245,11 +247,11 @@ mod test {
 
     #[test]
     fn assigning_then_removing_results_in_removal() {
-        let mut doc = Document::<i32>::new();
+        let mut doc = Document::new();
         let node = Uuid::nil();
 
         let map_id = doc.make_map(node);
-        let val = doc.make_val(1, node);
+        let val = doc.make_val(1.into(), node);
         let key = AssignKey::MapKey("test".into());
 
         let assign_id = doc.assign(map_id, key.clone(), val, BTreeSet::new(), node);

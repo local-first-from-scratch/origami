@@ -1,13 +1,14 @@
+use super::value::Value;
 use crate::timestamp::Timestamp;
 use std::collections::BTreeSet;
 
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialOrd, PartialEq, Clone)]
 #[repr(C)]
-pub enum Operation<Val: Clone> {
+pub enum Operation {
     MakeMap,
     MakeList,
     MakeVal {
-        val: Val,
+        val: Value,
     },
     InsertAfter {
         prev: Timestamp,
