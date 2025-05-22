@@ -81,7 +81,7 @@ impl<Val: Ord + Clone> Document<Val> {
                 self.assignment
                     .entry(*obj)
                     .or_default()
-                    .assign(*obj, key.clone(), *val, prev);
+                    .assign(id, key.clone(), *val, prev);
             }
 
             Operation::InsertAfter { prev } => {
@@ -241,5 +241,26 @@ mod test {
 
         // Check that the assignment entry was created for the non-existent object
         assert!(doc.assignment.contains_key(&non_existent_id));
+    }
+
+    #[test]
+    fn assigning_then_removing_results_in_removal() {
+        let mut doc = Document::<i32>::new();
+        let node = Uuid::nil();
+
+        let map_id = doc.make_map(node);
+        let val = doc.make_val(1, node);
+        let key = AssignKey::MapKey("test".into());
+
+        let assign_id = doc.assign(map_id, key.clone(), val, BTreeSet::new(), node);
+        doc.remove(map_id, key.clone(), BTreeSet::from([assign_id]), node);
+
+        assert!(
+            doc.assignment
+                .get(&map_id)
+                .and_then(|a| a.get(&key))
+                .is_none(),
+            "{key:?} was unexpectedly still present for map {map_id} in doc {doc:#?}",
+        );
     }
 }
