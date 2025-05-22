@@ -28,6 +28,18 @@ impl Assign {
         entry.insert(id, val);
     }
 
+    pub fn remove(&mut self, key: &AssignKey, prev: &BTreeSet<Timestamp>) {
+        if let Some(values) = self.values.get_mut(key) {
+            for prev_key in prev {
+                values.remove(prev_key);
+            }
+
+            if values.is_empty() {
+                self.values.remove(key);
+            }
+        }
+    }
+
     pub fn get(&self, key: &AssignKey) -> Option<&BTreeMap<Timestamp, Timestamp>> where {
         self.values.get(key)
     }
@@ -105,5 +117,50 @@ mod test {
             assign.values.get(&key),
             Some(&BTreeMap::from([(operation_id_b, value_b)]))
         )
+    }
+
+    #[test]
+    fn remove_removes_only_values_indicated_by_prev() {
+        let mut assign = Assign::new();
+
+        let key = AssignKey::MapKey("a".into());
+
+        let operation_id_a = Timestamp::new(0, Uuid::nil());
+        let value_a = Timestamp::new(1, Uuid::nil());
+
+        let operation_id_b = Timestamp::new(2, Uuid::nil());
+        let value_b = Timestamp::new(3, Uuid::nil());
+
+        // Add two values
+        assign.assign(operation_id_a, key.clone(), value_a, &BTreeSet::new());
+        assign.assign(operation_id_b, key.clone(), value_b, &BTreeSet::new());
+
+        // Remove only the first value
+        assign.remove(&key, &BTreeSet::from([operation_id_a]));
+
+        // Verify that only the second value remains
+        assert_eq!(
+            assign.values.get(&key),
+            Some(&BTreeMap::from([(operation_id_b, value_b)]))
+        );
+    }
+
+    #[test]
+    fn remove_removes_the_entire_key_if_all_values_are_removed() {
+        let mut assign = Assign::new();
+
+        let key = AssignKey::MapKey("a".into());
+
+        let operation_id = Timestamp::new(0, Uuid::nil());
+        let value = Timestamp::new(1, Uuid::nil());
+
+        // Add a value
+        assign.assign(operation_id, key.clone(), value, &BTreeSet::new());
+
+        // Remove the value
+        assign.remove(&key, &BTreeSet::from([operation_id]));
+
+        // Verify that the key is no longer in the map
+        assert_eq!(assign.values.get(&key), None);
     }
 }

@@ -90,7 +90,11 @@ impl<Val: Ord + Clone> Document<Val> {
                 self.ordering.insert_after(id, *prev);
             }
 
-            _ => todo!(),
+            Operation::Remove { obj, key, prev } => {
+                self.assignment
+                    .entry(*obj)
+                    .and_modify(|a| a.remove(key, prev));
+            }
         };
     }
 
@@ -158,16 +162,16 @@ impl<Val: Ord + Clone> Document<Val> {
 
     pub fn remove(
         &mut self,
-        _obj: Timestamp,
-        _key: AssignKey,
-        _prev: BTreeSet<Timestamp>,
+        obj: Timestamp,
+        key: AssignKey,
+        prev: BTreeSet<Timestamp>,
         node: Uuid,
     ) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
+        let op = Operation::Remove { obj, key, prev };
 
-        // TODO: look up key, insert into map or list, fail on val or missing key
-        // self.operations
-        //     .insert((id, Operation::Remove { obj, key, prev }));
+        self.apply(id, &op);
+        self.operations.insert((id, op));
 
         id
     }
