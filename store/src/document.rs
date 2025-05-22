@@ -8,9 +8,7 @@ pub use operation::AssignKey;
 use operation::Operation;
 use order::Order;
 use std::collections::{BTreeMap, BTreeSet};
-use thiserror::Error;
 use uuid::Uuid;
-use wasm_bindgen::JsValue;
 
 #[derive(Debug)]
 pub struct Document<Val: Ord + Clone> {
