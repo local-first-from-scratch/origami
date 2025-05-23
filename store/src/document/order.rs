@@ -84,7 +84,7 @@ mod test {
     proptest! {
         #[test]
         fn iteration_retains_ordering(values: Vec<Timestamp>) {
-            prop_assume!(values.len() > 0);
+            prop_assume!(!values.is_empty());
 
             let mut order = Order::new();
             values.windows(2).for_each(|window| order.insert_after(window[1], window[0]));

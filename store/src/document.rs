@@ -105,7 +105,7 @@ impl Document {
                     AssignKey::InsertAfter(timestamp) => self
                         .list_items
                         .entry(*obj)
-                        .or_insert_with(|| Assign::new())
+                        .or_insert_with(Assign::new)
                         .assign(id, *timestamp, *val, prev),
                 };
             }
