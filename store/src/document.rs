@@ -16,11 +16,11 @@ use value::{NULL, Value};
 pub struct Document {
     operations: Vec<(Timestamp, Operation)>,
 
-    ordering: Order,
-    assignment: BTreeMap<Timestamp, Assign>,
+    maps: BTreeMap<Timestamp, Assign<String>>,
 
-    maps: BTreeSet<Timestamp>,
-    lists: BTreeSet<Timestamp>,
+    list_items: BTreeMap<Timestamp, Assign<Timestamp>>,
+    list_ordering: Order,
+
     values: BTreeMap<Timestamp, Value>,
 
     highest_counter: u64,
@@ -31,12 +31,12 @@ impl Document {
         Self {
             operations: Vec::new(),
 
-            ordering: Order::new(),
-            assignment: BTreeMap::new(),
+            maps: BTreeMap::new(),
+
+            list_items: BTreeMap::new(),
+            list_ordering: Order::new(),
 
             values: BTreeMap::new(),
-            maps: BTreeSet::new(),
-            lists: BTreeSet::new(),
 
             highest_counter: 0,
         }
@@ -62,13 +62,22 @@ impl Document {
 
     fn apply(&mut self, id: Timestamp, operation: &Operation) {
         match operation {
-            Operation::MakeMap | Operation::MakeList => {
+            Operation::MakeMap => {
                 debug_assert!(
-                    !self.assignment.contains_key(&id),
-                    "document already contains {id}"
+                    !self.maps.contains_key(&id),
+                    "document.maps already contains {id}"
                 );
 
-                self.assignment.insert(id, Assign::default());
+                self.maps.insert(id, Assign::new());
+            }
+
+            Operation::MakeList => {
+                debug_assert!(
+                    !self.maps.contains_key(&id),
+                    "document.lists already contains {id}"
+                );
+
+                self.list_items.insert(id, Assign::new());
             }
 
             Operation::MakeVal { val } => {
@@ -86,21 +95,35 @@ impl Document {
                 val,
                 prev,
             } => {
-                self.assignment
-                    .entry(*obj)
-                    .or_default()
-                    .assign(id, key.clone(), *val, prev);
+                match key {
+                    AssignKey::MapKey(key) => {
+                        self.maps
+                            .entry(*obj)
+                            .or_default()
+                            .assign(id, key.clone(), *val, prev)
+                    }
+                    AssignKey::InsertAfter(timestamp) => self
+                        .list_items
+                        .entry(*obj)
+                        .or_insert_with(|| Assign::new())
+                        .assign(id, *timestamp, *val, prev),
+                };
             }
 
             Operation::InsertAfter { prev } => {
-                self.ordering.insert_after(id, *prev);
+                self.list_ordering.insert_after(id, *prev);
             }
 
-            Operation::Remove { obj, key, prev } => {
-                self.assignment
-                    .entry(*obj)
-                    .and_modify(|a| a.remove(key, prev));
-            }
+            Operation::Remove { obj, key, prev } => match key {
+                AssignKey::MapKey(key) => {
+                    self.maps.entry(*obj).and_modify(|a| a.remove(key, prev));
+                }
+                AssignKey::InsertAfter(timestamp) => {
+                    self.list_items
+                        .entry(*obj)
+                        .and_modify(|a| a.remove(timestamp, prev));
+                }
+            },
         };
     }
 
@@ -110,7 +133,6 @@ impl Document {
 
         self.apply(id, &op);
         self.operations.push((id, op));
-        self.maps.insert(id);
 
         id
     }
@@ -121,7 +143,6 @@ impl Document {
 
         self.apply(id, &op);
         self.operations.push((id, op));
-        self.lists.insert(id);
 
         id
     }
@@ -192,9 +213,9 @@ impl Document {
     }
 
     fn get(&self, id: &Timestamp) -> Value {
-        if self.maps.contains(id) {
+        if self.maps.contains_key(id) {
             self.get_map(id)
-        } else if self.lists.contains(id) {
+        } else if self.list_items.contains_key(id) {
             self.get_list(id)
         } else if let Some(val) = self.values.get(id) {
             val.clone()
@@ -206,7 +227,7 @@ impl Document {
     fn get_map(&self, id: &Timestamp) -> Value {
         let mut map = BTreeMap::new();
 
-        if let Some(assign) = self.assignment.get(id) {
+        if let Some(assign) = self.maps.get(id) {
             for (k, v) in assign.iter_map() {
                 if v.len() == 1 {
                     map.insert(k.to_string(), self.get(v[0]));
@@ -222,9 +243,9 @@ impl Document {
     fn get_list(&self, id: &Timestamp) -> Value {
         let mut list = Vec::new();
 
-        if let Some(assign) = self.assignment.get(id) {
-            for item_id in self.ordering.iter(id) {
-                if let Some(values) = assign.get(&AssignKey::InsertAfter(*item_id)) {
+        if let Some(assign) = self.list_items.get(id) {
+            for item_id in self.list_ordering.iter(id) {
+                if let Some(values) = assign.get(item_id) {
                     if values.len() == 1 {
                         list.push(self.get(values.first_key_value().unwrap().1))
                     } else {
@@ -251,7 +272,7 @@ mod test {
         let map_id = doc.make_map(node_id);
 
         // The timestamp should now exist in the document
-        assert!(doc.assignment.contains_key(&map_id));
+        assert!(doc.maps.contains_key(&map_id));
     }
 
     #[test]
@@ -262,7 +283,7 @@ mod test {
         let list_id = doc.make_list(node_id);
 
         // The timestamp should now exist in the document
-        assert!(doc.assignment.contains_key(&list_id));
+        assert!(doc.list_items.contains_key(&list_id));
     }
 
     #[test]
@@ -303,7 +324,7 @@ mod test {
         );
 
         // Check that the assignment entry was created for the non-existent object
-        assert!(doc.assignment.contains_key(&non_existent_id));
+        assert!(doc.maps.contains_key(&non_existent_id));
     }
 
     #[test]
@@ -313,16 +334,15 @@ mod test {
 
         let map_id = doc.make_map(node);
         let val = doc.make_val(1.into(), node);
-        let key = AssignKey::MapKey("test".into());
 
-        let assign_id = doc.assign(map_id, key.clone(), val, BTreeSet::new(), node);
-        doc.remove(map_id, key.clone(), BTreeSet::from([assign_id]), node);
+        let key = "test".to_string();
+        let assign_key = AssignKey::MapKey(key.clone());
+
+        let assign_id = doc.assign(map_id, assign_key.clone(), val, BTreeSet::new(), node);
+        doc.remove(map_id, assign_key, BTreeSet::from([assign_id]), node);
 
         assert!(
-            doc.assignment
-                .get(&map_id)
-                .and_then(|a| a.get(&key))
-                .is_none(),
+            doc.maps.get(&map_id).and_then(|a| a.get(&key)).is_none(),
             "{key:?} was unexpectedly still present for map {map_id} in doc {doc:#?}",
         );
     }
