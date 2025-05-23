@@ -4,12 +4,13 @@ Cargo.lock: Cargo.toml store/Cargo.toml
 	cargo build
 
 store/pkg/package.json: store/src/* store/Cargo.toml Cargo.lock
+	rm -rf store/pkg
 	wasm-pack build store
 
 frontend/bun.lock: frontend/package.json store/pkg/package.json
 	cd frontend; bun install
 
-frontend/dist/index.html: frontend/src/* frontend/package.json frontend/bun.lock
+frontend/dist/index.html: frontend/src/* frontend/package.json frontend/bun.lock store/pkg/package.json
 	cd frontend; bun run build
 
 .PHONY: lint
