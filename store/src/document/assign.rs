@@ -43,6 +43,13 @@ impl Assign {
     pub fn get(&self, key: &AssignKey) -> Option<&BTreeMap<Timestamp, Timestamp>> {
         self.values.get(key)
     }
+
+    pub fn iter_map(&self) -> impl Iterator<Item = (&str, Vec<&Timestamp>)> {
+        self.values.iter().filter_map(|(k, v)| match k {
+            AssignKey::MapKey(key) => Some((key.as_str(), v.values().collect())),
+            AssignKey::InsertAfter(..) => None,
+        })
+    }
 }
 
 #[cfg(test)]

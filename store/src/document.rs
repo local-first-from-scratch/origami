@@ -10,7 +10,7 @@ use operation::Operation;
 use order::Order;
 use std::collections::{BTreeMap, BTreeSet};
 use uuid::Uuid;
-use value::Value;
+use value::{NULL, Value};
 
 #[derive(Debug)]
 pub struct Document {
@@ -18,6 +18,9 @@ pub struct Document {
 
     ordering: Order,
     assignment: BTreeMap<Timestamp, Assign>,
+
+    maps: BTreeSet<Timestamp>,
+    lists: BTreeSet<Timestamp>,
     values: BTreeMap<Timestamp, Value>,
 
     highest_counter: u64,
@@ -30,7 +33,10 @@ impl Document {
 
             ordering: Order::new(),
             assignment: BTreeMap::new(),
+
             values: BTreeMap::new(),
+            maps: BTreeSet::new(),
+            lists: BTreeSet::new(),
 
             highest_counter: 0,
         }
@@ -44,7 +50,7 @@ impl Document {
         self.highest_counter
     }
 
-    pub fn root(&mut self) -> Option<&Timestamp> {
+    fn root(&self) -> Option<&Timestamp> {
         for (id, op) in &self.operations {
             if matches!(op, Operation::MakeMap | Operation::MakeList) {
                 return Some(id);
@@ -104,6 +110,7 @@ impl Document {
 
         self.apply(id, &op);
         self.operations.push((id, op));
+        self.maps.insert(id);
 
         id
     }
@@ -114,6 +121,7 @@ impl Document {
 
         self.apply(id, &op);
         self.operations.push((id, op));
+        self.lists.insert(id);
 
         id
     }
@@ -174,6 +182,59 @@ impl Document {
         self.operations.push((id, op));
 
         id
+    }
+
+    pub fn as_value(&self) -> Value {
+        match self.root() {
+            None => NULL,
+            Some(root) => self.get(root),
+        }
+    }
+
+    fn get(&self, id: &Timestamp) -> Value {
+        if self.maps.contains(id) {
+            self.get_map(id)
+        } else if self.lists.contains(id) {
+            self.get_list(id)
+        } else if let Some(val) = self.values.get(id) {
+            val.clone()
+        } else {
+            NULL
+        }
+    }
+
+    fn get_map(&self, id: &Timestamp) -> Value {
+        let mut map = BTreeMap::new();
+
+        if let Some(assign) = self.assignment.get(id) {
+            for (k, v) in assign.iter_map() {
+                if v.len() == 1 {
+                    map.insert(k.to_string(), self.get(v[0]));
+                } else {
+                    todo!("multiple-valued key in map")
+                }
+            }
+        }
+
+        Value::Map(map)
+    }
+
+    fn get_list(&self, id: &Timestamp) -> Value {
+        let mut list = Vec::new();
+
+        if let Some(assign) = self.assignment.get(id) {
+            for item_id in self.ordering.iter(id) {
+                if let Some(values) = assign.get(&AssignKey::InsertAfter(*item_id)) {
+                    if values.len() == 1 {
+                        list.push(self.get(values.first_key_value().unwrap().1))
+                    } else {
+                        todo!("multiple-valued key in list")
+                    }
+                }
+            }
+        }
+
+        Value::List(list)
     }
 }
 

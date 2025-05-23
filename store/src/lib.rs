@@ -18,18 +18,13 @@ extern "C" {
 }
 
 #[wasm_bindgen]
-pub fn dry_run() {
+pub fn dry_run() -> JsValue {
     set_panic_hook();
 
     let mut doc: Document = Document::new();
     let node = Uuid::from_u128(0);
 
     log(&format!("{doc:#?}"));
-
-    {
-        let root = doc.root();
-        log(&format!("first root: {root:#?}"))
-    }
 
     {
         let map_id = doc.make_map(node);
@@ -96,8 +91,11 @@ pub fn dry_run() {
         );
     }
 
-    log(&format!("new root: {:#?}", doc.root()));
     log(&format!("new doc: {doc:#?}"));
+
+    let v = doc.as_value();
+    log(&format!("{v:#?}"));
+    v.into()
 }
 
 #[wasm_bindgen]

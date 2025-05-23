@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+pub const NULL: Value = Value::Null;
+
 #[derive(Debug, PartialOrd, PartialEq, Clone)]
 pub enum Value {
     Number(f64),
