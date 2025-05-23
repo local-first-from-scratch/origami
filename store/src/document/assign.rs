@@ -40,7 +40,7 @@ impl Assign {
         }
     }
 
-    pub fn get(&self, key: &AssignKey) -> Option<&BTreeMap<Timestamp, Timestamp>> where {
+    pub fn get(&self, key: &AssignKey) -> Option<&BTreeMap<Timestamp, Timestamp>> {
         self.values.get(key)
     }
 }
