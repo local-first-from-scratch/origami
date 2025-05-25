@@ -10,7 +10,7 @@ use operation::Operation;
 use order::Order;
 use std::collections::{BTreeMap, BTreeSet};
 use uuid::Uuid;
-use value::{NULL, Value};
+pub use value::{NULL, Value};
 
 #[derive(Debug)]
 pub struct Document {
@@ -50,7 +50,7 @@ impl Document {
         self.highest_counter
     }
 
-    fn root(&self) -> Option<&Timestamp> {
+    pub fn root(&self) -> Option<&Timestamp> {
         for (id, op) in &self.operations {
             if matches!(op, Operation::MakeMap | Operation::MakeList) {
                 return Some(id);
