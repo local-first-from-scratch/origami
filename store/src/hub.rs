@@ -20,6 +20,15 @@ impl Hub {
         }
     }
 
+    pub fn create(&mut self) -> Handle {
+        let doc_id = Uuid::new_v4();
+        let doc = Arc::new(RwLock::new(Document::new()));
+
+        self.documents.insert(doc_id.to_string(), Arc::clone(&doc));
+
+        Handle { doc }
+    }
+
     pub fn lookup(&self, document_id: js_sys::JsString) -> Handle {
         let id: String = document_id.into();
         let doc = self.documents.get(&id).unwrap();
