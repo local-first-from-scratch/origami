@@ -20,7 +20,7 @@ impl Hub {
         }
     }
 
-    pub fn doc(&self, document_id: js_sys::JsString) -> Handle {
+    pub fn lookup(&self, document_id: js_sys::JsString) -> Handle {
         let id: String = document_id.into();
         let doc = self.documents.get(&id).unwrap();
 
