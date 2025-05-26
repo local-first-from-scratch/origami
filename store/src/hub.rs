@@ -20,11 +20,11 @@ impl Hub {
         }
     }
 
-    pub fn doc(&self, document_id: js_sys::JsString) -> Proxy {
+    pub fn doc(&self, document_id: js_sys::JsString) -> Handle {
         let id: String = document_id.into();
         let doc = self.documents.get(&id).unwrap();
 
-        Proxy {
+        Handle {
             doc: Arc::clone(doc),
         }
     }
@@ -37,12 +37,12 @@ impl Hub {
 }
 
 #[wasm_bindgen]
-pub struct Proxy {
+pub struct Handle {
     doc: Arc<RwLock<Document>>,
 }
 
 #[wasm_bindgen]
-impl Proxy {
+impl Handle {
     /// Get the current value. In cases where there is more than one current
     /// value, this will give you an arbitrary (but consistent) result.
     pub fn current(&self) -> Result<JsValue, JsString> {
