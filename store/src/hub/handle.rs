@@ -10,7 +10,7 @@ pub struct Handle {
     actor: Arc<Uuid>,
     doc: Arc<RwLock<Document>>,
     doc_id: Uuid,
-    subscriptions: Arc<RwLock<Subscriptions>>,
+    subscriptions: Arc<RwLock<Subscriptions<js_sys::Function>>>,
 }
 
 impl Handle {
@@ -18,7 +18,7 @@ impl Handle {
         actor: Arc<Uuid>,
         doc: Arc<RwLock<Document>>,
         doc_id: Uuid,
-        subscriptions: Arc<RwLock<Subscriptions>>,
+        subscriptions: Arc<RwLock<Subscriptions<js_sys::Function>>>,
     ) -> Self {
         Self {
             actor,

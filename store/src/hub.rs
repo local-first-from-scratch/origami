@@ -15,7 +15,7 @@ use wasm_bindgen::prelude::*;
 pub struct Hub {
     actor: Arc<Uuid>,
     documents: BTreeMap<Uuid, Arc<RwLock<Document>>>,
-    subscriptions: Arc<RwLock<Subscriptions>>,
+    subscriptions: Arc<RwLock<Subscriptions<js_sys::Function>>>,
 }
 
 #[wasm_bindgen]
