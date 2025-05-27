@@ -75,8 +75,6 @@ impl Handle {
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("Error with UUID: {0}")]
-    BadUuid(#[from] uuid::Error),
     #[error("Lock was poisoned")]
     LockWasPoisoned,
     #[error("Missing document root")]

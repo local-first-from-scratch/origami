@@ -1,7 +1,7 @@
 mod handle;
 mod subscriptions;
 
-use crate::document::{Document, ValueError};
+use crate::document::Document;
 use handle::Handle;
 use js_sys::JsString;
 use std::collections::BTreeMap;
@@ -92,12 +92,6 @@ pub enum Error {
     BadUuid(#[from] uuid::Error),
     #[error("Lock was poisoned")]
     LockWasPoisoned,
-    #[error("Missing document root")]
-    MissingRoot,
-    #[error("Could not convert value: {0}")]
-    ValueConversion(#[from] ValueError),
-    #[error("Error in subscription: {0}")]
-    Notify(#[from] subscriptions::Error),
 }
 
 impl From<Error> for JsValue {
