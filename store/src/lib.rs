@@ -22,7 +22,7 @@ extern "C" {
 pub fn dry_run() -> JsValue {
     set_panic_hook();
 
-    let mut doc: Document = Document::new();
+    let mut doc: Document = Document::default();
     let node = Uuid::from_u128(0);
 
     log(&format!("{doc:#?}"));

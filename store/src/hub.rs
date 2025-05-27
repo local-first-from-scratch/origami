@@ -41,7 +41,7 @@ impl Hub {
     pub fn create(&mut self, root_kind: RootKind) -> Handle {
         let doc_id = Uuid::new_v4();
 
-        let mut doc = Document::new();
+        let mut doc = Document::default();
         match root_kind {
             RootKind::Map => doc.make_map(*self.actor),
             RootKind::List => doc.make_list(*self.actor),

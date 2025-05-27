@@ -1,18 +1,12 @@
 use crate::timestamp::Timestamp;
 use std::collections::BTreeMap;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Order {
     ordering: BTreeMap<Timestamp, Timestamp>,
 }
 
 impl Order {
-    pub fn new() -> Self {
-        Self {
-            ordering: BTreeMap::new(),
-        }
-    }
-
     pub fn insert_after(&mut self, op_id: Timestamp, after: Timestamp) {
         if let Some(previous) = self.ordering.insert(after, op_id) {
             self.ordering.insert(op_id, previous);
@@ -67,7 +61,7 @@ mod test {
         // rule that out!
         #[test]
         fn insert_after_never_has_duplicate_values(values: Vec<Timestamp>) {
-            let mut order = Order::new();
+            let mut order = Order::default();
             values.windows(2).for_each(|window| order.insert_after(window[1], window[0]));
 
             let mut count: BTreeMap<Timestamp, usize> = BTreeMap::new();
@@ -86,7 +80,7 @@ mod test {
         fn iteration_retains_ordering(values: Vec<Timestamp>) {
             prop_assume!(!values.is_empty());
 
-            let mut order = Order::new();
+            let mut order = Order::default();
             values.windows(2).for_each(|window| order.insert_after(window[1], window[0]));
 
             assert_eq!(values[1..], order.iter(&values[0]).copied().collect::<Vec<Timestamp>>())
