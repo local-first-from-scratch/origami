@@ -1,7 +1,7 @@
-use crate::document::Document;
+use crate::document::{Document, ValueError};
 use js_sys::JsString;
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, PoisonError, RwLock};
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
 
@@ -67,18 +67,6 @@ impl Hub {
     pub fn unsubscribe(&mut self, subscription_id: u64) {}
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("Error with UUID: {0}")]
-    BadUuid(#[from] uuid::Error),
-}
-
-impl From<Error> for JsValue {
-    fn from(value: Error) -> Self {
-        value.to_string().into()
-    }
-}
-
 #[wasm_bindgen]
 pub enum RootKind {
     Map,
@@ -102,16 +90,12 @@ impl Handle {
             .map_err(|e| e.to_string().into())
     }
 
-    pub fn set(&self, key: JsString, value: JsValue) {
-        let mut doc = self.doc.write().expect("a non-poisoned lock");
-        let root = *doc.root().expect("an existing doc root");
+    pub fn set(&self, key: JsString, value: JsValue) -> Result<(), Error> {
+        let mut doc = self.doc.write()?;
+        let root = *doc.root().ok_or(Error::MissingRoot)?;
 
-        let val_id = doc.make_val(
-            value
-                .try_into()
-                .expect("a safe value to store in a document"),
-            *self.actor,
-        );
+        let val_id = doc.make_val(value.try_into()?, *self.actor);
+
         doc.assign(
             root, // Use the stored root value directly
             crate::document::AssignKey::MapKey(key.into()),
@@ -119,5 +103,31 @@ impl Handle {
             BTreeSet::new(),
             *self.actor,
         );
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("Error with UUID: {0}")]
+    BadUuid(#[from] uuid::Error),
+    #[error("Lock was poisoned")]
+    PoisonError,
+    #[error("Missing document root")]
+    MissingRoot,
+    #[error("Could not convert value: {0}")]
+    ValueConversion(#[from] ValueError),
+}
+
+impl From<Error> for JsValue {
+    fn from(value: Error) -> Self {
+        value.to_string().into()
+    }
+}
+
+impl<T> From<PoisonError<T>> for Error {
+    fn from(_: PoisonError<T>) -> Self {
+        Self::PoisonError
     }
 }
