@@ -106,20 +106,18 @@ impl Handle {
         let mut doc = self.doc.write().expect("a non-poisoned lock");
         let root = *doc.root().expect("an existing doc root");
 
-        let me = Uuid::nil();
-
         let val_id = doc.make_val(
             value
                 .try_into()
                 .expect("a safe value to store in a document"),
-            me,
+            *self.actor,
         );
         doc.assign(
             root, // Use the stored root value directly
             crate::document::AssignKey::MapKey(key.into()),
             val_id,
             BTreeSet::new(),
-            me,
+            *self.actor,
         );
     }
 }
