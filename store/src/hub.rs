@@ -1,4 +1,4 @@
-use crate::document::{Document, Value};
+use crate::document::Document;
 use js_sys::JsString;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, RwLock};
@@ -8,16 +8,23 @@ use wasm_bindgen::prelude::*;
 #[derive(Debug)]
 #[wasm_bindgen]
 pub struct Hub {
+    actor: Uuid,
     documents: BTreeMap<String, Arc<RwLock<Document>>>,
 }
 
 #[wasm_bindgen]
 impl Hub {
     #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
-        Self {
+    pub fn new(existing_id: Option<JsString>) -> Result<Self, Error> {
+        let actor = match existing_id {
+            Some(existing) => Uuid::try_parse(&Into::<String>::into(existing))?,
+            None => Uuid::new_v4(),
+        };
+
+        Ok(Self {
+            actor,
             documents: BTreeMap::new(),
-        }
+        })
     }
 
     pub fn create(&mut self) -> Handle {
@@ -43,6 +50,18 @@ impl Hub {
     }
 
     pub fn unsubscribe(&mut self, subscription_id: u64) {}
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("Error with UUID: {0}")]
+    BadUuid(#[from] uuid::Error),
+}
+
+impl From<Error> for JsValue {
+    fn from(value: Error) -> Self {
+        value.to_string().into()
+    }
 }
 
 #[wasm_bindgen]
