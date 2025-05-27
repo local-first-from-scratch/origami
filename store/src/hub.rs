@@ -1,7 +1,6 @@
 mod subscriptions;
 
 use crate::document::{Document, ValueError};
-use crate::timestamp::Timestamp;
 use js_sys::JsString;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, PoisonError, RwLock};
@@ -141,13 +140,13 @@ pub enum Error {
     #[error("Error with UUID: {0}")]
     BadUuid(#[from] uuid::Error),
     #[error("Lock was poisoned")]
-    PoisonError,
+    LockWasPoisoned,
     #[error("Missing document root")]
     MissingRoot,
     #[error("Could not convert value: {0}")]
     ValueConversion(#[from] ValueError),
     #[error("Error in subscription: {0}")]
-    NotifyError(#[from] subscriptions::Error),
+    Notify(#[from] subscriptions::Error),
 }
 
 impl From<Error> for JsValue {
@@ -158,6 +157,6 @@ impl From<Error> for JsValue {
 
 impl<T> From<PoisonError<T>> for Error {
     fn from(_: PoisonError<T>) -> Self {
-        Self::PoisonError
+        Self::LockWasPoisoned
     }
 }
