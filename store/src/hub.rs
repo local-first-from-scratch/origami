@@ -34,6 +34,7 @@ impl Hub {
         })
     }
 
+    #[wasm_bindgen(getter, js_name = actorId)]
     pub fn actor_id(&self) -> JsString {
         self.actor.to_string().into()
     }
