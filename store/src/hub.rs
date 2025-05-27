@@ -27,7 +27,11 @@ impl Hub {
         })
     }
 
-    pub fn create(&mut self) -> Handle {
+    pub fn actor_id(&self) -> JsString {
+        self.actor.to_string().into()
+    }
+
+    pub fn create(&mut self, root_kind: RootKind) -> Handle {
         let doc_id = Uuid::new_v4();
         let doc = Arc::new(RwLock::new(Document::new()));
 
@@ -66,6 +70,12 @@ impl From<Error> for JsValue {
     fn from(value: Error) -> Self {
         value.to_string().into()
     }
+}
+
+#[wasm_bindgen]
+pub enum RootKind {
+    Map,
+    List,
 }
 
 #[wasm_bindgen]
