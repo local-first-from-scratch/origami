@@ -242,6 +242,21 @@ impl Document {
 
         Value::List(list)
     }
+
+    pub fn current_assigns(&self, id: &Timestamp, assign_key: &AssignKey) -> BTreeSet<Timestamp> {
+        match assign_key {
+            AssignKey::MapKey(key) => match self.maps.get(id) {
+                Some(assign) => assign
+                    .get(key)
+                    .map(|ks| ks.keys().copied().collect())
+                    .unwrap_or_else(BTreeSet::new),
+                // Returning an empty set here because this method is used to
+                // get the `prev` value for assign calls.
+                None => BTreeSet::new(),
+            },
+            AssignKey::InsertAfter(_insert_after) => todo!(),
+        }
+    }
 }
 
 #[cfg(test)]

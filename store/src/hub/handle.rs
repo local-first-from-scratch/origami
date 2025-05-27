@@ -1,7 +1,6 @@
 use super::subscriptions::{self, Subscriptions};
 use crate::document::{Document, ValueError};
 use js_sys::JsString;
-use std::collections::BTreeSet;
 use std::sync::{Arc, PoisonError, RwLock};
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
@@ -49,13 +48,11 @@ impl Handle {
 
             let val_id = doc.make_val(value.try_into()?, *self.actor);
 
-            doc.assign(
-                root, // Use the stored root value directly
-                crate::document::AssignKey::MapKey(key.into()),
-                val_id,
-                BTreeSet::new(),
-                *self.actor,
-            );
+            let key = crate::document::AssignKey::MapKey(key.into());
+
+            let current = doc.current_assigns(&root, &key);
+
+            doc.assign(root, key, val_id, current, *self.actor);
         }
 
         // Notify subscribers
