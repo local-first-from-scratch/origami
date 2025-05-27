@@ -8,7 +8,7 @@ use wasm_bindgen::prelude::*;
 #[derive(Debug)]
 #[wasm_bindgen]
 pub struct Hub {
-    actor: Uuid,
+    actor: Arc<Uuid>,
     documents: BTreeMap<String, Arc<RwLock<Document>>>,
 }
 
@@ -22,7 +22,7 @@ impl Hub {
         };
 
         Ok(Self {
-            actor,
+            actor: Arc::new(actor),
             documents: BTreeMap::new(),
         })
     }
@@ -33,7 +33,10 @@ impl Hub {
 
         self.documents.insert(doc_id.to_string(), Arc::clone(&doc));
 
-        Handle { doc }
+        Handle {
+            actor: Arc::clone(&self.actor),
+            doc,
+        }
     }
 
     pub fn lookup(&self, document_id: js_sys::JsString) -> Handle {
@@ -41,6 +44,7 @@ impl Hub {
         let doc = self.documents.get(&id).unwrap();
 
         Handle {
+            actor: Arc::clone(&self.actor),
             doc: Arc::clone(doc),
         }
     }
@@ -66,6 +70,7 @@ impl From<Error> for JsValue {
 
 #[wasm_bindgen]
 pub struct Handle {
+    actor: Arc<Uuid>,
     doc: Arc<RwLock<Document>>,
 }
 
