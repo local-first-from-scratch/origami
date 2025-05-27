@@ -10,7 +10,7 @@ use operation::Operation;
 use order::Order;
 use std::collections::{BTreeMap, BTreeSet};
 use uuid::Uuid;
-pub use value::{ValueError, NULL, Value};
+pub use value::{NULL, Value, ValueError};
 
 #[derive(Debug)]
 pub struct Document {

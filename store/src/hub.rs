@@ -1,7 +1,11 @@
+mod subscriptions;
+
 use crate::document::{Document, ValueError};
+use crate::timestamp::Timestamp;
 use js_sys::JsString;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, PoisonError, RwLock};
+use subscriptions::Subscriptions;
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
 
@@ -9,7 +13,8 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 pub struct Hub {
     actor: Arc<Uuid>,
-    documents: BTreeMap<String, Arc<RwLock<Document>>>,
+    documents: BTreeMap<Uuid, Arc<RwLock<Document>>>,
+    subscriptions: Arc<RwLock<Subscriptions>>,
 }
 
 #[wasm_bindgen]
@@ -24,6 +29,7 @@ impl Hub {
         Ok(Self {
             actor: Arc::new(actor),
             documents: BTreeMap::new(),
+            subscriptions: Arc::default(),
         })
     }
 
@@ -42,29 +48,35 @@ impl Hub {
 
         let doc = Arc::new(RwLock::new(doc));
 
-        self.documents.insert(doc_id.to_string(), Arc::clone(&doc));
+        self.documents.insert(doc_id, Arc::clone(&doc));
 
         Handle {
             actor: Arc::clone(&self.actor),
             doc,
+            doc_id,
+            subscriptions: Arc::clone(&self.subscriptions),
         }
     }
 
-    pub fn lookup(&self, document_id: js_sys::JsString) -> Handle {
-        let id: String = document_id.into();
-        let doc = self.documents.get(&id).unwrap();
+    pub fn lookup(&self, document_id: js_sys::JsString) -> Result<Handle, Error> {
+        let owned_document_id: String = document_id.into();
+        let doc_id: Uuid = owned_document_id.try_into()?;
+        let doc = self.documents.get(&doc_id).unwrap();
 
-        Handle {
+        Ok(Handle {
             actor: Arc::clone(&self.actor),
             doc: Arc::clone(doc),
-        }
+            doc_id,
+            subscriptions: Arc::clone(&self.subscriptions),
+        })
     }
 
-    pub fn subscribe(&mut self, document_id: js_sys::JsString, cb: &js_sys::Function) -> u64 {
-        0
-    }
+    pub fn unsubscribe(&mut self, subscription_id: usize) -> Result<(), Error> {
+        let mut subs = self.subscriptions.write()?;
+        subs.unsubscribe(subscription_id);
 
-    pub fn unsubscribe(&mut self, subscription_id: u64) {}
+        Ok(())
+    }
 }
 
 #[wasm_bindgen]
@@ -77,6 +89,8 @@ pub enum RootKind {
 pub struct Handle {
     actor: Arc<Uuid>,
     doc: Arc<RwLock<Document>>,
+    doc_id: Uuid,
+    subscriptions: Arc<RwLock<Subscriptions>>,
 }
 
 #[wasm_bindgen]
@@ -91,20 +105,34 @@ impl Handle {
     }
 
     pub fn set(&self, key: JsString, value: JsValue) -> Result<(), Error> {
-        let mut doc = self.doc.write()?;
-        let root = *doc.root().ok_or(Error::MissingRoot)?;
+        // Make the write
+        {
+            let mut doc = self.doc.write()?;
+            let root = *doc.root().ok_or(Error::MissingRoot)?;
 
-        let val_id = doc.make_val(value.try_into()?, *self.actor);
+            let val_id = doc.make_val(value.try_into()?, *self.actor);
 
-        doc.assign(
-            root, // Use the stored root value directly
-            crate::document::AssignKey::MapKey(key.into()),
-            val_id,
-            BTreeSet::new(),
-            *self.actor,
-        );
+            doc.assign(
+                root, // Use the stored root value directly
+                crate::document::AssignKey::MapKey(key.into()),
+                val_id,
+                BTreeSet::new(),
+                *self.actor,
+            );
+        }
+
+        // Notify subscribers
+        {
+            let subs = self.subscriptions.read()?;
+            subs.notify(&self.doc_id)?;
+        }
 
         Ok(())
+    }
+
+    pub fn subscribe(&mut self, cb: js_sys::Function) -> Result<usize, Error> {
+        let mut subs = self.subscriptions.write()?;
+        Ok(subs.subscribe(&self.doc_id, cb))
     }
 }
 
@@ -118,6 +146,8 @@ pub enum Error {
     MissingRoot,
     #[error("Could not convert value: {0}")]
     ValueConversion(#[from] ValueError),
+    #[error("Error in subscription: {0}")]
+    NotifyError(#[from] subscriptions::Error),
 }
 
 impl From<Error> for JsValue {
