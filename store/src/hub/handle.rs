@@ -31,6 +31,12 @@ impl Handle {
 
 #[wasm_bindgen]
 impl Handle {
+    /// Get the document ID
+    #[wasm_bindgen(getter, js_name = documentId)]
+    pub fn document_id(&self) -> JsString {
+        self.doc_id.to_string().into()
+    }
+
     /// Get the current value. In cases where there is more than one current
     /// value, this will give you an arbitrary (but consistent) result.
     pub fn current(&self) -> Result<JsValue, JsString> {
