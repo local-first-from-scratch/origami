@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use uuid::Uuid;
 use wasm_bindgen::JsValue;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Subscriptions {
     subscriptions: BTreeMap<Uuid, BTreeMap<usize, js_sys::Function>>,
     next_id: usize,
@@ -41,6 +41,12 @@ impl Subscriptions {
         }
 
         Ok(())
+    }
+}
+
+impl Default for Subscriptions {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
