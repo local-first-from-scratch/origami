@@ -33,7 +33,14 @@ impl Hub {
 
     pub fn create(&mut self, root_kind: RootKind) -> Handle {
         let doc_id = Uuid::new_v4();
-        let doc = Arc::new(RwLock::new(Document::new()));
+
+        let mut doc = Document::new();
+        match root_kind {
+            RootKind::Map => doc.make_map(*self.actor),
+            RootKind::List => doc.make_list(*self.actor),
+        };
+
+        let doc = Arc::new(RwLock::new(doc));
 
         self.documents.insert(doc_id.to_string(), Arc::clone(&doc));
 
