@@ -46,6 +46,7 @@ impl Handle {
             .map_err(|e| e.to_string().into())
     }
 
+    /// Assign a value in a map at the current location.
     pub fn set(&self, key: JsString, value: JsValue) -> Result<(), Error> {
         // Make the write
         {
@@ -70,6 +71,9 @@ impl Handle {
         Ok(())
     }
 
+    /// Subscribe to changes at the current document/location. This will give
+    /// you a subscription ID. When you're done listening, call
+    /// `Hub.unsubscribe` with that ID to clean up.
     pub fn subscribe(&mut self, cb: js_sys::Function) -> Result<usize, Error> {
         let mut subs = self.subscriptions.write()?;
         Ok(subs.subscribe(&self.doc_id, cb))
