@@ -21,6 +21,8 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 uuid = { version = "1.16.0", features = ["rng", "v4", "js"] }
 js-sys = "0.3.77"
 thiserror = "2.0.12"
+serde = { version = "1.0.219", features = ["derive"] }
+serde-wasm-bindgen = "0.6.5"
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"
