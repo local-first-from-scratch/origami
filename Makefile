@@ -4,8 +4,8 @@ Cargo.lock: Cargo.toml store/Cargo.toml
 	cargo build
 
 store/pkg/package.json: store/src/* store/Cargo.toml Cargo.lock
-	rm -rf store/pkg
-	wasm-pack build store
+	rm -rf $(@D)
+	wasm-pack build store -d $(@D)
 
 frontend/bun.lock: frontend/package.json store/pkg/package.json
 	cd frontend; bun install
