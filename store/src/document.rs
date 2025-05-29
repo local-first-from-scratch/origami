@@ -8,9 +8,10 @@ use assign::Assign;
 pub use operation::AssignKey;
 use operation::Operation;
 use order::Order;
+use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use uuid::Uuid;
-pub use value::{NULL, Value, ValueError};
+pub use value::{Value, ValueError};
 
 #[derive(Debug, Default)]
 pub struct Document {
@@ -190,26 +191,26 @@ impl Document {
         id
     }
 
-    pub fn as_value(&self) -> Value {
+    pub fn as_value(&self) -> serde_json::Value {
         match self.root() {
-            None => NULL,
+            None => serde_json::Value::Null,
             Some(root) => self.get(root),
         }
     }
 
-    fn get(&self, id: &Timestamp) -> Value {
+    fn get(&self, id: &Timestamp) -> serde_json::Value {
         if self.maps.contains_key(id) {
             self.get_map(id)
         } else if self.list_items.contains_key(id) {
             self.get_list(id)
         } else if let Some(val) = self.values.get(id) {
-            val.clone()
+            val.into()
         } else {
-            NULL
+            serde_json::Value::Null
         }
     }
 
-    fn get_map(&self, id: &Timestamp) -> Value {
+    fn get_map(&self, id: &Timestamp) -> serde_json::Value {
         let mut map = BTreeMap::new();
 
         if let Some(assign) = self.maps.get(id) {
@@ -222,10 +223,10 @@ impl Document {
             }
         }
 
-        Value::Map(map)
+        json!(map)
     }
 
-    fn get_list(&self, id: &Timestamp) -> Value {
+    fn get_list(&self, id: &Timestamp) -> serde_json::Value {
         let mut list = Vec::new();
 
         if let Some(assign) = self.list_items.get(id) {
@@ -240,7 +241,7 @@ impl Document {
             }
         }
 
-        Value::List(list)
+        json!(list)
     }
 
     pub fn current_assigns(&self, id: &Timestamp, assign_key: &AssignKey) -> BTreeSet<Timestamp> {

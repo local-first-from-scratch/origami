@@ -1,35 +1,17 @@
-use std::collections::BTreeMap;
+use serde_json::json;
+use wasm_bindgen::JsValue;
 
-pub const NULL: Value = Value::Null;
+const NULL: Value = Value::Null;
 
-#[derive(Debug, PartialOrd, PartialEq, Clone)]
+/// The values as stored by our document. These should always be scalar;
+/// collections are represented via the document structure instead. However,
+/// it's fine to add additional data types.
+#[derive(Debug, PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Value {
     Number(f64),
     String(String),
     Bool(bool),
-    Map(BTreeMap<String, Value>),
-    List(Vec<Value>),
     Null,
-}
-
-impl From<Vec<Value>> for Value {
-    fn from(v: Vec<Value>) -> Self {
-        Self::List(v)
-    }
-}
-
-impl<Inner> From<BTreeMap<String, Inner>> for Value
-where
-    Inner: Into<Value>,
-{
-    fn from(orig: BTreeMap<String, Inner>) -> Self {
-        let mut transformed = BTreeMap::new();
-        for (k, v) in orig.into_iter() {
-            transformed.insert(k, v.into());
-        }
-
-        Self::Map(transformed)
-    }
 }
 
 impl From<bool> for Value {
@@ -68,45 +50,13 @@ impl From<u32> for Value {
     }
 }
 
-#[wasm_bindgen::prelude::wasm_bindgen]
-extern "C" {
-    type ObjectExt;
-
-    #[wasm_bindgen(method, indexing_setter)]
-    fn set(this: &ObjectExt, key: js_sys::JsString, value: wasm_bindgen::JsValue);
-}
-
-// Implementation note: keep `use`s and similar from leaking outside this
-// implementation so we can put it behind a flag eventually for server
-// compilation.
-impl From<Value> for wasm_bindgen::JsValue {
-    fn from(value: Value) -> Self {
-        use js_sys::{Array, Object};
-        use wasm_bindgen::{JsCast, JsValue};
-
+impl From<&Value> for serde_json::Value {
+    fn from(value: &Value) -> Self {
         match value {
-            Value::Number(i) => JsValue::from_f64(i),
-            Value::String(s) => JsValue::from_str(&s),
-            Value::Bool(b) => JsValue::from_bool(b),
-            Value::Map(map) => {
-                let out = Object::new();
-
-                for (k, v) in map {
-                    out.unchecked_ref::<ObjectExt>().set(k.into(), v.into())
-                }
-
-                out.into()
-            }
-            Value::List(values) => {
-                let out = Array::new();
-
-                for v in values {
-                    out.push(&v.into());
-                }
-
-                out.into()
-            }
-            Value::Null => JsValue::null(),
+            Value::Number(num) => json!(num),
+            Value::String(string) => json!(string),
+            Value::Bool(bool) => json!(bool),
+            Value::Null => json!(null),
         }
     }
 }
@@ -121,6 +71,8 @@ impl TryFrom<wasm_bindgen::JsValue> for Value {
             Ok(Self::Bool(bool))
         } else if let Some(string) = value.as_string() {
             Ok(Self::String(string))
+        } else if value == JsValue::NULL {
+            Ok(NULL)
         } else {
             Err(ValueError::Unsupported)
         }
