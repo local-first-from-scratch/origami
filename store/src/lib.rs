@@ -19,7 +19,7 @@ extern "C" {
 }
 
 #[wasm_bindgen]
-pub fn dry_run() -> JsValue {
+pub fn dry_run() -> Result<JsValue, serde_wasm_bindgen::Error> {
     set_panic_hook();
 
     let mut doc: Document = Document::default();
@@ -96,5 +96,5 @@ pub fn dry_run() -> JsValue {
 
     let v = doc.as_value();
     log(&format!("{v:#?}"));
-    v.into()
+    serde_wasm_bindgen::to_value(&v)
 }
