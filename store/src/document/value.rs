@@ -9,29 +9,7 @@ pub enum Value {
     Number(f64),
     String(String),
     Bool(bool),
-    Map(BTreeMap<String, Value>),
-    List(Vec<Value>),
     Null,
-}
-
-impl From<Vec<Value>> for Value {
-    fn from(v: Vec<Value>) -> Self {
-        Self::List(v)
-    }
-}
-
-impl<Inner> From<BTreeMap<String, Inner>> for Value
-where
-    Inner: Into<Value>,
-{
-    fn from(orig: BTreeMap<String, Inner>) -> Self {
-        let mut transformed = BTreeMap::new();
-        for (k, v) in orig.into_iter() {
-            transformed.insert(k, v.into());
-        }
-
-        Self::Map(transformed)
-    }
 }
 
 impl From<bool> for Value {
@@ -76,8 +54,6 @@ impl From<&Value> for serde_json::Value {
             Value::Number(num) => json!(num),
             Value::String(string) => json!(string),
             Value::Bool(bool) => json!(bool),
-            Value::Map(map) => json!(map),
-            Value::List(values) => json!(values),
             Value::Null => json!(null),
         }
     }
