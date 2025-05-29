@@ -1,6 +1,8 @@
 use serde_json::json;
 use wasm_bindgen::JsValue;
 
+const NULL: Value = Value::Null;
+
 /// The values as stored by our document. These should always be scalar;
 /// collections are represented via the document structure instead. However,
 /// it's fine to add additional data types.
@@ -70,7 +72,7 @@ impl TryFrom<wasm_bindgen::JsValue> for Value {
         } else if let Some(string) = value.as_string() {
             Ok(Self::String(string))
         } else if value == JsValue::NULL {
-            Ok(Self::Null)
+            Ok(NULL)
         } else {
             Err(ValueError::Unsupported)
         }
