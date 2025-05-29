@@ -1,0 +1,20 @@
+{
+  "name": "store",
+  "type": "module",
+  "collaborators": [
+    "Brian Hicks <brian@brianthicks.com>"
+  ],
+  "version": "0.1.0",
+  "files": [
+    "store_bg.wasm",
+    "store.js",
+    "store_bg.js",
+    "store.d.ts"
+  ],
+  "main": "store.js",
+  "types": "store.d.ts",
+  "sideEffects": [
+    "./store.js",
+    "./snippets/*"
+  ]
+}

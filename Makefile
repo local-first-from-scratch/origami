@@ -5,7 +5,8 @@ Cargo.lock: Cargo.toml store/Cargo.toml
 
 store/pkg/package.json: store/src/* store/Cargo.toml Cargo.lock
 	rm -rf $(@D)
-	wasm-pack build store -d $(@D)
+	wasm-pack build store
+	find $(@D) | grep -ve package.json -e .gitignore | sed "s|$(@D)||g" > $(@D)/.gitignore
 
 frontend/bun.lock: frontend/package.json store/pkg/package.json
 	cd frontend; bun install
