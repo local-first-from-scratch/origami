@@ -1,9 +1,9 @@
-use std::collections::BTreeMap;
-
 use serde_json::json;
+use wasm_bindgen::JsValue;
 
-pub const NULL: Value = Value::Null;
-
+/// The values as stored by our document. These should always be scalar;
+/// collections are represented via the document structure instead. However,
+/// it's fine to add additional data types.
 #[derive(Debug, PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Value {
     Number(f64),
@@ -69,6 +69,8 @@ impl TryFrom<wasm_bindgen::JsValue> for Value {
             Ok(Self::Bool(bool))
         } else if let Some(string) = value.as_string() {
             Ok(Self::String(string))
+        } else if value == JsValue::NULL {
+            Ok(Self::Null)
         } else {
             Err(ValueError::Unsupported)
         }

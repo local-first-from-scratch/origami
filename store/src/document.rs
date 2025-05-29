@@ -11,7 +11,7 @@ use order::Order;
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use uuid::Uuid;
-pub use value::{NULL, Value, ValueError};
+pub use value::{Value, ValueError};
 
 #[derive(Debug, Default)]
 pub struct Document {
