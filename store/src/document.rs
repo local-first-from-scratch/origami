@@ -10,9 +10,9 @@ use operation::Operation;
 use order::Order;
 use std::collections::{BTreeMap, BTreeSet};
 use uuid::Uuid;
-use value::{NULL, Value};
+pub use value::{NULL, Value, ValueError};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Document {
     operations: Vec<(Timestamp, Operation)>,
 
@@ -27,21 +27,6 @@ pub struct Document {
 }
 
 impl Document {
-    pub fn new() -> Self {
-        Self {
-            operations: Vec::new(),
-
-            maps: BTreeMap::new(),
-
-            list_items: BTreeMap::new(),
-            list_ordering: Order::new(),
-
-            values: BTreeMap::new(),
-
-            highest_counter: 0,
-        }
-    }
-
     fn next_timestamp_counter(&mut self) -> u64 {
         // note for later: we'll have to do a `max` between this and any
         // incoming operations. The increment will be the same, though.
@@ -50,7 +35,7 @@ impl Document {
         self.highest_counter
     }
 
-    fn root(&self) -> Option<&Timestamp> {
+    pub fn root(&self) -> Option<&Timestamp> {
         for (id, op) in &self.operations {
             if matches!(op, Operation::MakeMap | Operation::MakeList) {
                 return Some(id);
@@ -257,6 +242,21 @@ impl Document {
 
         Value::List(list)
     }
+
+    pub fn current_assigns(&self, id: &Timestamp, assign_key: &AssignKey) -> BTreeSet<Timestamp> {
+        match assign_key {
+            AssignKey::MapKey(key) => match self.maps.get(id) {
+                Some(assign) => assign
+                    .get(key)
+                    .map(|ks| ks.keys().copied().collect())
+                    .unwrap_or_else(BTreeSet::new),
+                // Returning an empty set here because this method is used to
+                // get the `prev` value for assign calls.
+                None => BTreeSet::new(),
+            },
+            AssignKey::InsertAfter(_insert_after) => todo!(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -266,7 +266,7 @@ mod test {
 
     #[test]
     fn make_map_gives_timestamp_for_map() {
-        let mut doc = Document::new();
+        let mut doc = Document::default();
         let node_id = Uuid::new_v4();
 
         let map_id = doc.make_map(node_id);
@@ -277,7 +277,7 @@ mod test {
 
     #[test]
     fn make_list_gives_timestamp_for_list() {
-        let mut doc = Document::new();
+        let mut doc = Document::default();
         let node_id = Uuid::new_v4();
 
         let list_id = doc.make_list(node_id);
@@ -288,7 +288,7 @@ mod test {
 
     #[test]
     fn make_val_gives_timestamp_for_val() {
-        let mut doc = Document::new();
+        let mut doc = Document::default();
         let node_id = Uuid::new_v4();
         let value = Value::from(0);
 
@@ -305,7 +305,7 @@ mod test {
         // see arguments both directions. On one hand, we want to be resistant
         // to buggy behavior. On the other hand, once an operation has been
         // accepted we need to acknowledge and deal with it.
-        let mut doc = Document::new();
+        let mut doc = Document::default();
         let node_id = Uuid::new_v4();
 
         // Create a timestamp that doesn't exist in the document
@@ -329,7 +329,7 @@ mod test {
 
     #[test]
     fn assigning_then_removing_results_in_removal() {
-        let mut doc = Document::new();
+        let mut doc = Document::default();
         let node = Uuid::nil();
 
         let map_id = doc.make_map(node);

@@ -110,3 +110,25 @@ impl From<Value> for wasm_bindgen::JsValue {
         }
     }
 }
+
+impl TryFrom<wasm_bindgen::JsValue> for Value {
+    type Error = ValueError;
+
+    fn try_from(value: wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
+        if let Some(num) = value.as_f64() {
+            Ok(Self::Number(num))
+        } else if let Some(bool) = value.as_bool() {
+            Ok(Self::Bool(bool))
+        } else if let Some(string) = value.as_string() {
+            Ok(Self::String(string))
+        } else {
+            Err(ValueError::Unsupported)
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ValueError {
+    #[error("Unsupported JS type")]
+    Unsupported,
+}

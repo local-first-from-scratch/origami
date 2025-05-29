@@ -3,6 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Default)]
 pub struct Assign<K: Ord> {
+    // Within the values here, keys identify assign operations and values
+    // identify the values that were set in the assign operation.
     values: BTreeMap<K, BTreeMap<Timestamp, Timestamp>>,
 }
 

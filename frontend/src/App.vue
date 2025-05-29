@@ -1,12 +1,22 @@
 <script setup lang="ts">
 import * as store from "store";
-import { useDoc } from "./doc";
+import { hub, watch } from "./doc";
 
 console.log(store.dry_run());
 
-const doc = useDoc("12345");
+const doc = watch(hub.create(store.RootKind.Map));
+
+setInterval(() => {
+  doc.value.set("x", new Date().getTime());
+}, 1000);
+
+const doc2 = watch(hub.lookup(doc.value.documentId));
 </script>
 
 <template>
-  {{doc}}
+  Doc: {{doc}}
+
+  Current value: {{doc.current()}}
+
+  Other: {{doc2.current()}}
 </template>

@@ -1,17 +1,19 @@
-import { subscribe, unsubscribe } from "store";
-import { type Ref, onUnmounted, ref } from "vue";
+import { type Handle, Hub } from "store";
+import { type Ref, onUnmounted, shallowRef, triggerRef } from "vue";
 
-export function useDoc<T>(id: string): Ref<T | null> {
-  const doc: Ref<T | null> = ref(null);
+export const hub = new Hub();
 
-  const subscriptionId = subscribe(id, (newDoc: T) => {
-    console.log("new doc", newDoc);
-    doc.value = newDoc;
+export function watch(handle: Handle): Ref<Handle> {
+  const wrapped: Ref<Handle> = shallowRef(handle);
+
+  const subscriptionId = handle.subscribe(() => {
+    console.log("triggered handle subscription");
+    triggerRef(wrapped);
   });
 
   onUnmounted(() => {
-    unsubscribe(subscriptionId);
+    hub.unsubscribe(subscriptionId);
   });
 
-  return doc;
+  return wrapped;
 }
