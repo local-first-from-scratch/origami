@@ -96,5 +96,5 @@ pub fn dry_run() -> Result<JsValue, serde_wasm_bindgen::Error> {
 
     let v = doc.as_value();
     log(&format!("{v:#?}"));
-    serde_wasm_bindgen::to_value(&v)
+    serde_wasm_bindgen::to_value(&doc.as_patch())
 }
