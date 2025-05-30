@@ -5,6 +5,7 @@ mod value;
 
 use crate::timestamp::Timestamp;
 use assign::Assign;
+use json_patch::{AddOperation, PatchOperation, jsonptr::PointerBuf};
 pub use operation::AssignKey;
 use operation::Operation;
 use order::Order;
@@ -191,6 +192,83 @@ impl Document {
         id
     }
 
+    pub fn as_patch(&self) -> Vec<PatchOperation> {
+        let mut ops = Vec::new();
+        let here = PointerBuf::new();
+
+        if let Some(root) = self.root() {
+            self.push_patch(root, here, &mut ops)
+        }
+
+        ops
+    }
+
+    fn push_patch(&self, id: &Timestamp, here: PointerBuf, ops: &mut Vec<PatchOperation>) {
+        if self.maps.contains_key(id) {
+            self.push_map_patches(id, here, ops)
+        } else if self.list_items.contains_key(id) {
+            self.push_list_patches(id, here, ops)
+        } else if let Some(val) = self.values.get(id) {
+            ops.push(PatchOperation::Add(AddOperation {
+                path: here,
+                value: val.into(),
+            }))
+        } else {
+            // TODO: a better error if we don't have all the values we expected.
+            // This shouldn't happen (it can currently happen if you remove an
+            // item from a list, because we remove the item from the assign but
+            // not the linked list used for ordering.)
+            todo!("we don't have all the values we expected")
+        }
+    }
+
+    /// Push JSON patches to the `ops`, assuming that the ID has already been
+    /// validated as a map. If that assumption does not hold, this is a no-op.
+    fn push_map_patches(&self, id: &Timestamp, here: PointerBuf, ops: &mut Vec<PatchOperation>) {
+        if let Some(assign) = self.maps.get(id) {
+            if !here.is_root() {
+                ops.push(PatchOperation::Add(AddOperation {
+                    path: here.clone(),
+                    value: json!({}),
+                }));
+            }
+
+            for (k, v) in assign.iter_map() {
+                if v.len() == 1 {
+                    self.push_patch(v[0], here.with_trailing_token(k), ops);
+                } else {
+                    todo!("multiple-valued key in map")
+                }
+            }
+        }
+    }
+
+    /// Push JSON patches to the `ops`, assuming that the ID has already been validated as a list.
+    fn push_list_patches(&self, id: &Timestamp, here: PointerBuf, ops: &mut Vec<PatchOperation>) {
+        if let Some(assign) = self.list_items.get(id) {
+            if !here.is_root() {
+                ops.push(PatchOperation::Add(AddOperation {
+                    path: here.clone(),
+                    value: json!([]),
+                }));
+            }
+
+            for (index, item_id) in self.list_ordering.iter(id).enumerate() {
+                if let Some(values) = assign.get(item_id) {
+                    if values.len() == 1 {
+                        self.push_patch(
+                            values.first_key_value().unwrap().1,
+                            here.with_trailing_token(index),
+                            ops,
+                        )
+                    } else {
+                        todo!("multiple-valued key in list")
+                    }
+                }
+            }
+        }
+    }
+
     pub fn as_value(&self) -> serde_json::Value {
         match self.root() {
             None => serde_json::Value::Null,
@@ -346,5 +424,145 @@ mod test {
             doc.maps.get(&map_id).and_then(|a| a.get(&key)).is_none(),
             "{key:?} was unexpectedly still present for map {map_id} in doc {doc:#?}",
         );
+    }
+
+    mod as_patch {
+        use super::*;
+        use pretty_assertions::assert_eq;
+        use serde_json::from_value;
+
+        macro_rules! patch {
+            ($patch:tt) => {
+                from_value::<json_patch::Patch>(json!($patch)).unwrap().0
+            };
+        }
+
+        #[test]
+        fn object_root() {
+            let mut doc = Document::default();
+            doc.make_map(Uuid::nil());
+
+            assert_eq!(doc.as_patch(), patch!([]));
+        }
+
+        #[test]
+        fn object_assign() {
+            let mut doc = Document::default();
+            let root_id = doc.make_map(Uuid::nil());
+            let val_id = doc.make_val("world".into(), Uuid::nil());
+            doc.assign(
+                root_id,
+                AssignKey::MapKey("hello".to_string()),
+                val_id,
+                BTreeSet::new(),
+                Uuid::nil(),
+            );
+
+            assert_eq!(
+                doc.as_patch(),
+                patch!([
+                    { "op": "add", "path": "/hello", "value": "world" },
+                ])
+            );
+        }
+
+        #[test]
+        fn list_assign() {
+            let mut doc = Document::default();
+            let root_id = doc.make_list(Uuid::nil());
+
+            let val_a = doc.make_val("hello".into(), Uuid::nil());
+            let insert_a = doc.insert_after(root_id, Uuid::nil());
+            doc.assign(
+                root_id,
+                AssignKey::InsertAfter(insert_a),
+                val_a,
+                BTreeSet::new(),
+                Uuid::nil(),
+            );
+
+            let val_b = doc.make_val("howdy".into(), Uuid::nil());
+            let insert_b = doc.insert_after(insert_a, Uuid::nil());
+            doc.assign(
+                root_id,
+                AssignKey::InsertAfter(insert_b),
+                val_b,
+                BTreeSet::new(),
+                Uuid::nil(),
+            );
+
+            assert_eq!(
+                doc.as_patch(),
+                patch!([
+                    { "op": "add", "path": "/0", "value": "hello" },
+                    { "op": "add", "path": "/1", "value": "howdy" },
+                ])
+            );
+        }
+
+        #[test]
+        fn deep_assign_map() {
+            let mut doc = Document::default();
+            let root_id = doc.make_map(Uuid::nil());
+
+            let greetings_id = doc.make_map(Uuid::nil());
+            doc.assign(
+                root_id,
+                AssignKey::MapKey("greetings".into()),
+                greetings_id,
+                BTreeSet::new(),
+                Uuid::nil(),
+            );
+
+            let world_id = doc.make_val("world".into(), Uuid::nil());
+            doc.assign(
+                greetings_id,
+                AssignKey::MapKey("hello".to_string()),
+                world_id,
+                BTreeSet::new(),
+                Uuid::nil(),
+            );
+
+            assert_eq!(
+                doc.as_patch(),
+                patch!([
+                    { "op": "add", "path": "/greetings", "value": {} },
+                    { "op": "add", "path": "/greetings/hello", "value": "world" },
+                ])
+            );
+        }
+
+        #[test]
+        fn deep_assign_list() {
+            let mut doc = Document::default();
+            let root_id = doc.make_map(Uuid::nil());
+
+            let greetings_id = doc.make_list(Uuid::nil());
+            doc.assign(
+                root_id,
+                AssignKey::MapKey("greetings".into()),
+                greetings_id,
+                BTreeSet::new(),
+                Uuid::nil(),
+            );
+
+            let insert_id = doc.insert_after(greetings_id, Uuid::nil());
+            let world_id = doc.make_val("world".into(), Uuid::nil());
+            doc.assign(
+                greetings_id,
+                AssignKey::InsertAfter(insert_id),
+                world_id,
+                BTreeSet::new(),
+                Uuid::nil(),
+            );
+
+            assert_eq!(
+                doc.as_patch(),
+                patch!([
+                    { "op": "add", "path": "/greetings", "value": [] },
+                    { "op": "add", "path": "/greetings/0", "value": "world" },
+                ])
+            );
+        }
     }
 }
