@@ -18,7 +18,7 @@ wasm-bindgen = { version = "0.2.84", features = ["strict-macro"] }
 # all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
 # code size when deploying.
 console_error_panic_hook = { version = "0.1.7", optional = true }
-uuid = { version = "1.16.0", features = ["rng", "v4", "js"] }
+uuid = { version = "1.17.0", features = ["rng", "v4", "js"] }
 js-sys = "0.3.77"
 thiserror = "2.0.12"
 serde = { version = "1.0.219", features = ["derive"] }
