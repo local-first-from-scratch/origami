@@ -54,7 +54,7 @@ impl Migrator {
         Ok(())
     }
 
-    fn migration_path(&self, from: Option<&str>, to: &str) -> Option<Vec<&Migration>> {
+    pub fn migration_path(&self, from: Option<&str>, to: &str) -> Option<Vec<&Migration>> {
         let source_node_id = match from {
             Some(from) => *self.node_ids.get(from)?,
             None => self.root_node_id,
