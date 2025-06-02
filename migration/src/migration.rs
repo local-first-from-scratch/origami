@@ -4,5 +4,5 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Migration {
     base: Option<String>,
-    operations: Vec<Lens>,
+    ops: Vec<Lens>,
 }

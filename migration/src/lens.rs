@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -29,7 +30,7 @@ pub struct AddRemove {
     name: String,
     // type: type
     default: Value,
-    required: bool,
+    nullable: bool,
     // items: type
 }
 
@@ -53,16 +54,19 @@ pub struct WrapHead {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct In {
     name: String,
-    lens: Vec<Lens>,
+    ops: Vec<Lens>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Map {
-    lens: Vec<Lens>,
+    ops: Vec<Lens>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Convert {
     name: String,
-    mapping: Vec<(Value, Value)>,
+    // from_type: type,
+    // to_type: type,
+    forward: HashMap<Value, Value>,
+    reverse: HashMap<Value, Value>,
 }
