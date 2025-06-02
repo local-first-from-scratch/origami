@@ -3,6 +3,7 @@ use petgraph::{Graph, Undirected, algo::astar, graph::NodeIndex};
 use crate::migration::Migration;
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct Migrator {
     migrations: HashMap<NodeIndex, Migration>,
     root_node_id: NodeIndex,
@@ -53,8 +54,11 @@ impl Migrator {
         Ok(())
     }
 
-    fn migration_path(&mut self, from: &str, to: &str) -> Option<Vec<&Migration>> {
-        let source_node_id = *self.node_ids.get(from)?;
+    fn migration_path(&self, from: Option<&str>, to: &str) -> Option<Vec<&Migration>> {
+        let source_node_id = match from {
+            Some(from) => *self.node_ids.get(from)?,
+            None => self.root_node_id,
+        };
         let dest_node_id = *self.node_ids.get(to)?;
 
         astar(
@@ -66,6 +70,9 @@ impl Migrator {
         )
         .map(|(_, path)| {
             path.iter()
+                // We skip the first migration because we assume we're already
+                // at the state given by `from`.
+                .skip(1)
                 .map(|&node_id| self.migrations.get(&node_id).unwrap())
                 .collect()
         })
@@ -76,4 +83,53 @@ impl Migrator {
 pub enum AddError {
     #[error("Base migration not found: {0}")]
     MissingBase(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn migration_path() {
+        let mut migrator = Migrator::new();
+
+        let name_a = "a";
+        let migration_a = Migration {
+            base: None,
+            ops: vec![],
+        };
+        assert!(
+            migrator
+                .add_migration(name_a.to_string(), migration_a.clone())
+                .is_ok()
+        );
+
+        let name_b = "b";
+        let migration_b = Migration {
+            base: Some(name_a.to_string()),
+            ops: vec![],
+        };
+        assert!(
+            migrator
+                .add_migration(name_b.to_string(), migration_b.clone())
+                .is_ok()
+        );
+
+        let name_c = "c";
+        let migration_c = Migration {
+            base: Some(name_b.to_string()),
+            ops: vec![],
+        };
+        assert!(
+            migrator
+                .add_migration(name_c.to_string(), migration_c.clone())
+                .is_ok()
+        );
+
+        let path = migrator.migration_path(None, name_c);
+        println!("{:#?}", path);
+
+        assert_eq!(path, Some(vec![&migration_a, &migration_b, &migration_c]));
+    }
 }
