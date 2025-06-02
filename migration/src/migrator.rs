@@ -64,7 +64,7 @@ impl Migrator {
         astar(
             &self.graph,
             source_node_id,
-            |g| g == dest_node_id,
+            |n| n == dest_node_id,
             |_| 1,
             |_| 0,
         )
