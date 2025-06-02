@@ -3,7 +3,7 @@ all: frontend/dist/index.html
 Cargo.lock: Cargo.toml store/Cargo.toml
 	cargo build
 
-store/pkg/package.json: store/src/* store/Cargo.toml Cargo.lock
+store/pkg/package.json: store/* store/Cargo.toml Cargo.lock
 	rm -rf $(@D)
 	wasm-pack build store
 	find $(@D) | grep -ve package.json -e .gitignore | sed "s|$(@D)||g" > $(@D)/.gitignore
