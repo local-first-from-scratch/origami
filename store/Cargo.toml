@@ -11,7 +11,7 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-wasm-bindgen = { version = "0.2.84", features = ["strict-macro"] }
+wasm-bindgen = { version = "0.2.100", features = ["strict-macro"] }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
@@ -30,7 +30,7 @@ json-patch = "4.0.0"
 pretty_assertions = "1.4.1"
 proptest = "1.6.0"
 proptest-derive = "0.5.1"
-wasm-bindgen-test = "0.3.34"
+wasm-bindgen-test = "0.3.50"
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.
