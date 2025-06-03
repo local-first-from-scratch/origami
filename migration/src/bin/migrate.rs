@@ -74,7 +74,13 @@ impl Cli {
                     .migration_path(None, name)
                     .wrap_err_with(|| format!("could not find migration path to {}", name))?;
 
-                println!("{path:#?}")
+                println!(
+                    "{}",
+                    path.iter()
+                        .map(|m| m.name.clone())
+                        .collect::<Vec<String>>()
+                        .join(" -> ")
+                )
             }
         }
 
