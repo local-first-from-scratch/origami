@@ -28,10 +28,9 @@ pub enum Lens {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct AddRemove {
     pub name: String,
-    // pub type: type
+    #[serde(rename = "type")]
+    pub type_: jtd::SerdeSchema,
     pub default: Value,
-    pub nullable: bool,
-    // pub items: type
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -65,8 +64,8 @@ pub struct Map {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Convert {
     pub name: String,
-    // pub from_type: type,
-    // pub to_type: type,
+    pub from_type: jtd::SerdeSchema,
+    pub to_type: jtd::SerdeSchema,
     pub forward: HashMap<Value, Value>,
     pub reverse: HashMap<Value, Value>,
 }
