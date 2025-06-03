@@ -34,24 +34,26 @@ impl Migrator {
         }
     }
 
-    pub fn add_migration(&mut self, name: String, migration: Migration) -> Result<(), AddError> {
+    pub fn add_migration(&mut self, name: String, migration: Migration) {
         let node_id = self.graph.add_node(name.clone());
 
         self.node_ids.insert(name, node_id);
 
         let base_id = match &migration.base {
-            Some(base) => *self
-                .node_ids
-                .get(base)
-                .ok_or_else(|| AddError::MissingBase(base.clone()))?,
             None => self.root_node_id,
+            Some(base) => match self.node_ids.get(base) {
+                Some(id) => *id,
+                None => {
+                    let id = self.graph.add_node(base.clone());
+                    self.node_ids.insert(base.clone(), id);
+                    id
+                }
+            },
         };
 
         self.graph.add_edge(base_id, node_id, ());
 
         self.migrations.insert(node_id, migration);
-
-        Ok(())
     }
 
     pub fn migration_path(&self, from: Option<&str>, to: &str) -> Option<Vec<&Migration>> {
@@ -79,12 +81,6 @@ impl Migrator {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum AddError {
-    #[error("Base migration not found: {0}")]
-    MissingBase(String),
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -99,33 +95,21 @@ mod tests {
             base: None,
             ops: vec![],
         };
-        assert!(
-            migrator
-                .add_migration(name_a.to_string(), migration_a.clone())
-                .is_ok()
-        );
+        migrator.add_migration(name_a.to_string(), migration_a.clone());
 
         let name_b = "b";
         let migration_b = Migration {
             base: Some(name_a.to_string()),
             ops: vec![],
         };
-        assert!(
-            migrator
-                .add_migration(name_b.to_string(), migration_b.clone())
-                .is_ok()
-        );
+        migrator.add_migration(name_b.to_string(), migration_b.clone());
 
         let name_c = "c";
         let migration_c = Migration {
             base: Some(name_b.to_string()),
             ops: vec![],
         };
-        assert!(
-            migrator
-                .add_migration(name_c.to_string(), migration_c.clone())
-                .is_ok()
-        );
+        migrator.add_migration(name_c.to_string(), migration_c.clone());
 
         let path = migrator.migration_path(None, name_c);
         println!("{:#?}", path);
