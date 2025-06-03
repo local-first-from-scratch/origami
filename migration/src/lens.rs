@@ -69,3 +69,35 @@ pub struct Convert {
     pub forward: HashMap<Value, Value>,
     pub reverse: HashMap<Value, Value>,
 }
+
+impl Lens {
+    pub fn reversed(&self) -> Self {
+        match self {
+            Lens::Add(add_remove) => Lens::Remove(add_remove.clone()),
+            Lens::Remove(add_remove) => Lens::Add(add_remove.clone()),
+            Lens::Rename(Rename { from, to }) => Lens::Rename(Rename {
+                from: to.clone(),
+                to: from.clone(),
+            }),
+            Lens::Extract(extract_embed) => Lens::Embed(extract_embed.clone()),
+            Lens::Embed(extract_embed) => Lens::Embed(extract_embed.clone()),
+            Lens::Head(wrap_head) => Lens::Wrap(wrap_head.clone()),
+            Lens::Wrap(wrap_head) => Lens::Head(wrap_head.clone()),
+            Lens::In(..) => self.clone(),
+            Lens::Map(..) => self.clone(),
+            Lens::Convert(Convert {
+                name,
+                from_type,
+                to_type,
+                forward,
+                reverse,
+            }) => Lens::Convert(Convert {
+                name: name.clone(),
+                from_type: to_type.clone(),
+                to_type: from_type.clone(),
+                forward: reverse.clone(),
+                reverse: forward.clone(),
+            }),
+        }
+    }
+}
