@@ -21,6 +21,7 @@ impl Migrator {
         let migrations = HashMap::from([(
             root_node_id,
             Migration {
+                name: ROOT_ID.to_string(),
                 base: None,
                 ops: vec![],
             },
@@ -96,6 +97,7 @@ mod tests {
 
         let name_a = "a";
         let migration_a = Migration {
+            name: name_a.to_string(),
             base: None,
             ops: vec![],
         };
@@ -103,6 +105,7 @@ mod tests {
 
         let name_b = "b";
         let migration_b = Migration {
+            name: name_b.to_string(),
             base: Some(name_a.to_string()),
             ops: vec![],
         };
@@ -110,6 +113,7 @@ mod tests {
 
         let name_c = "c";
         let migration_c = Migration {
+            name: name_c.to_string(),
             base: Some(name_b.to_string()),
             ops: vec![],
         };
