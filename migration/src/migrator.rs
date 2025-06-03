@@ -34,28 +34,25 @@ impl Migrator {
         }
     }
 
-    pub fn add_migration(&mut self, name: String, migration: Migration) {
-        let node_id = match self.node_ids.get(&name) {
+    fn node_id(&mut self, name: &str) -> NodeIndex {
+        match self.node_ids.get(name) {
             Some(id) => *id,
             None => {
-                let id = self.graph.add_node(name.clone());
-                self.node_ids.insert(name.clone(), id);
+                let id = self.graph.add_node(name.to_string());
+                self.node_ids.insert(name.to_string(), id);
                 id
             }
-        };
+        }
+    }
+
+    pub fn add_migration(&mut self, name: String, migration: Migration) {
+        let node_id = self.node_id(&name);
 
         self.node_ids.insert(name, node_id);
 
         let base_id = match &migration.base {
             None => self.root_node_id,
-            Some(base) => match self.node_ids.get(base) {
-                Some(id) => *id,
-                None => {
-                    let id = self.graph.add_node(base.clone());
-                    self.node_ids.insert(base.clone(), id);
-                    id
-                }
-            },
+            Some(base) => self.node_id(&base),
         };
 
         self.graph.add_edge(base_id, node_id, ());
