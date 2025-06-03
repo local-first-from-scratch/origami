@@ -1,6 +1,0 @@
-base: user.v1
-
-ops:
-  - rename:
-      from: handle
-      to: username

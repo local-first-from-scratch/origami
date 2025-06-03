@@ -1,0 +1,28 @@
+{
+  "ops": [
+    {
+      "add": {
+        "name": "handle",
+        "type": "string",
+        "nullable": false,
+        "default": ""
+      }
+    },
+    {
+      "add": {
+        "name": "email",
+        "type": "string",
+        "nullable": false,
+        "default": ""
+      }
+    },
+    {
+      "add": {
+        "name": "status",
+        "type": "bool",
+        "default": true,
+        "nullable": false
+      }
+    }
+  ]
+}
