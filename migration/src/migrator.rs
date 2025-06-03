@@ -35,7 +35,14 @@ impl Migrator {
     }
 
     pub fn add_migration(&mut self, name: String, migration: Migration) {
-        let node_id = self.graph.add_node(name.clone());
+        let node_id = match self.node_ids.get(&name) {
+            Some(id) => *id,
+            None => {
+                let id = self.graph.add_node(name.clone());
+                self.node_ids.insert(name.clone(), id);
+                id
+            }
+        };
 
         self.node_ids.insert(name, node_id);
 
