@@ -27,46 +27,46 @@ pub enum Lens {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct AddRemove {
-    name: String,
-    // type: type
-    default: Value,
-    nullable: bool,
-    // items: type
+    pub name: String,
+    // pub type: type
+    pub default: Value,
+    pub nullable: bool,
+    // pub items: type
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Rename {
-    from: String,
-    to: String,
+    pub from: String,
+    pub to: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct ExtractEmbed {
-    host: String,
-    name: String,
+    pub host: String,
+    pub name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct WrapHead {
-    name: String,
+    pub name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct In {
-    name: String,
-    ops: Vec<Lens>,
+    pub name: String,
+    pub ops: Vec<Lens>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Map {
-    ops: Vec<Lens>,
+    pub ops: Vec<Lens>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Convert {
-    name: String,
-    // from_type: type,
-    // to_type: type,
-    forward: HashMap<Value, Value>,
-    reverse: HashMap<Value, Value>,
+    pub name: String,
+    // pub from_type: type,
+    // pub to_type: type,
+    pub forward: HashMap<Value, Value>,
+    pub reverse: HashMap<Value, Value>,
 }
