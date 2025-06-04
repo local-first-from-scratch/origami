@@ -6,46 +6,67 @@ A schema migration system inspired by [Cambria](https://www.inkandswitch.com/cam
 
 Migrations themselves look like this:
 
-```yaml
-ops:
-  - add:
-      name: title
-      type: string
-      default: ""
-  - add:
-      name: done
-      type: bool
-      default: false
+```json
+{
+  "name": "task.v1",
+  "ops": [
+    {
+      "add": {
+        "name": "title",
+        "type": { "type": "string" },
+        "default": ""
+      }
+    },
+    {
+      "add": {
+        "name": "done",
+        "type": { "type": "boolean" },
+        "default": false
+      }
+    }
+  ]
+}
 ```
 
-You'd store this in a file named something like `task.v1.yaml`, where `task.v1` becomes the name of the schema. As with other migration tools, you should check the migrations into source control and avoid changing them once they're applied.
+You'd store this in a file named something like `task.v1.json`, where `task.v1` is the name of the schema (this is just convention, however. The official schema name is the one in the `name` field.) As with other migration tools, you should check the migrations into source control and avoid changing them once they're applied.
 
 As you discover more about the system, you can add more fields or change existing ones:
 
-```yaml
-# The version this migration is based off of. For the initial migration for each
-# kind of object you're using, you can omit this. For subsequent migrations, it's required.
-base: task.v1
-
-ops:
-  - add:
-      name: due
-      type: int
-      nullable: true
-  - rename:
-      from: done
-      to: status
-  - convert:
-      name: status
-      fromType: bool
-      toType: string
-      forward:
-        true: complete
-        false: unstarted
-      reverse:
-        complete: true
-        unstarted: false
-        inProgress: false
+```json
+{
+  "name": "task.v2",
+  "base": "task.v1",
+  "ops": [
+    {
+      "add": {
+        "name": "due",
+        "type": { "type": "int32", "nullable": true }
+      }
+    },
+    {
+      "rename": {
+        "from": "done",
+        "to": "status"
+      }
+    },
+    {
+      "convert": {
+        "name": "status",
+        "fromType": { "type": "boolean" },
+        "toType": { "type": "string" },
+        "forward": {
+          "true": "complete",
+          "false": "unstarted"
+        },
+        "reverse": {
+          "complete": true,
+          "unstarted": false,
+          "inProgress": false
+        }
+      }
+    }
+  ]
+}
 ```
 
 ## The Graph
@@ -65,14 +86,12 @@ You can add and remove fields from a schema by using the `add` and `remove` opti
 | Field | Notes |
 |-|-|
 | `name` | The name of the field (in an object) to add or remove |
-| `type` | The type of the field for schema generation (accepted values TBD) |
-| `nullable` | Whether or not the `type` includes `null` |
-| `items` | If `type` is `list`, the type of items in the list. |
+| `type` | A JTD specifying the type of the field |
 | `default` | A default to use when reading data that does not have this field set yet |
 
 `add` and `remove` share the same schema because they mirror each other and may need to run in either direction, depending on the schema version you're reading.
 
-`nullable` is true by default. If you set it to `false`, `default` is required.
+If the JTD type does not include `nullable: true`, `default` is required.
 
 ### Rename
 
@@ -107,10 +126,14 @@ An example is in order. Say you have this structure:
 
 If you'd like `user` to be identified by `id` instead, here's how you'd write it:
 
-```yaml
-extract:
-  host: user
-  name: id
+```json
+{
+  "name": "extract-user-id",
+  "extract": {
+    "host": "user",
+    "name": "id"
+  }
+}
 ```
 
 In this case, you'd end up with this.
@@ -134,17 +157,31 @@ This brings us to the main limitation of this migration: all the other keys in t
 
 You can get around this in some cases by specifying `remove` operations for the other fields. So a migration like this:
 
-```yaml
-operations:
-  - in:
-      name: user
-      ops:
-        - remove:
-            name: username
-            type: string
-  - extract:
-      host: user
-      name: id
+```json
+{
+  "name": "remove-username-and-extract",
+  "operations": [
+    {
+      "in": {
+        "name": "user",
+        "ops": [
+          {
+            "remove": {
+              "name": "username",
+              "type": { "type": "string" }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "extract": {
+        "host": "user",
+        "name": "id"
+      }
+    }
+  ]
+}
 ```
 
 Could possibly recover the fields (but not the field information) from the document:
@@ -198,7 +235,7 @@ Combine with `in` to navigate to a key containing the list.
 | Field | Notes |
 |-|-|
 | `name` | The field to convert |
-| `fromType` | The type we're expecting to start with |
-| `toType` | The type we're expecting to end up with |
+| `fromType` | A JTD type definition object for the type we're expecting to start with |
+| `toType` | A JTD type definition object for the type we're expecting to end up with |
 | `forward` | A mapping from existing values to new values |
 | `reverse` | A mapping from new values to existing values |
