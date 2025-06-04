@@ -177,17 +177,17 @@ impl Lens {
                         return Err(ApplyToJtdError::ExtractExpectedProperties);
                     }
                 }
-                Lens::Embed(extract_embed) => todo!(),
-                Lens::Head(wrap_head) => todo!(),
-                Lens::Wrap(wrap_head) => todo!(),
+                Lens::Embed(_extract_embed) => todo!(),
+                Lens::Head(_wrap_head) => todo!(),
+                Lens::Wrap(_wrap_head) => todo!(),
                 Lens::In(_) => todo!(),
-                Lens::Map(map) => todo!(),
-                Lens::Convert(convert) => todo!(),
+                Lens::Map(_map) => todo!(),
+                Lens::Convert(_convert) => todo!(),
             }
 
             Ok(())
         } else {
-            return Err(ApplyToJtdError::NotARecord);
+            Err(ApplyToJtdError::NotARecord)
         }
     }
 }
