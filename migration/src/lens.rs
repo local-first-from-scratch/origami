@@ -30,7 +30,12 @@ pub struct AddRemove {
     pub name: String,
     #[serde(rename = "type")]
     pub type_: jtd::SerdeSchema,
+    #[serde(default = "null")]
     pub default: Value,
+}
+
+fn null() -> Value {
+    Value::Null
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]

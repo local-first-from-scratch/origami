@@ -46,14 +46,7 @@ impl Cli {
                 format!("could not parse migration {}", entry.path().display())
             })?;
 
-            let name = entry
-                .path()
-                .file_stem()
-                .wrap_err("could not convert file name to migration name")?
-                .to_string_lossy()
-                .to_string();
-
-            migrator.add_migration(name, migration);
+            migrator.add_migration(migration);
         }
 
         Ok(migrator)
@@ -71,16 +64,11 @@ impl Cli {
                 let migrator = self.get_migrator()?;
 
                 let path = migrator
-                    .migration_path(None, name)
+                    .migration_path(Some(name), "user.v1")
+                    // .migration_lenses(None, name)
                     .wrap_err_with(|| format!("could not find migration path to {}", name))?;
 
-                println!(
-                    "{}",
-                    path.iter()
-                        .map(|m| m.name.clone())
-                        .collect::<Vec<String>>()
-                        .join(" -> ")
-                )
+                println!("{path:#?}");
             }
         }
 

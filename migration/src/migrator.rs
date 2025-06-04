@@ -1,36 +1,25 @@
-use petgraph::{Graph, Undirected, algo::astar, graph::NodeIndex};
-
+use crate::lens::Lens;
 use crate::migration::Migration;
+use petgraph::{Directed, Graph, algo::astar, graph::NodeIndex};
 use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct Migrator {
-    migrations: HashMap<NodeIndex, Migration>,
     root_node_id: NodeIndex,
     node_ids: HashMap<String, NodeIndex>,
-    graph: Graph<String, (), Undirected>,
+    graph: Graph<(), Vec<Lens>, Directed>,
 }
 
 const ROOT_ID: &str = "ROOT";
 
 impl Migrator {
     pub fn new() -> Self {
-        let mut graph = Graph::new_undirected();
-        let root_node_id = graph.add_node(ROOT_ID.to_string());
-
-        let migrations = HashMap::from([(
-            root_node_id,
-            Migration {
-                name: ROOT_ID.to_string(),
-                base: None,
-                ops: vec![],
-            },
-        )]);
+        let mut graph = Graph::new();
+        let root_node_id = graph.add_node(());
 
         Migrator {
-            migrations,
             root_node_id,
-            node_ids: HashMap::new(),
+            node_ids: HashMap::from([("ROOT".to_string(), root_node_id)]),
             graph,
         }
     }
@@ -39,29 +28,36 @@ impl Migrator {
         match self.node_ids.get(name) {
             Some(id) => *id,
             None => {
-                let id = self.graph.add_node(name.to_string());
+                let id = self.graph.add_node(());
                 self.node_ids.insert(name.to_string(), id);
                 id
             }
         }
     }
 
-    pub fn add_migration(&mut self, name: String, migration: Migration) {
+    pub fn add_migration(&mut self, migration: Migration) {
+        let Migration { name, base, ops } = migration;
+
+        // Generate our node IDs so we can add edges
         let node_id = self.node_id(&name);
-
-        self.node_ids.insert(name, node_id);
-
-        let base_id = match &migration.base {
+        let base_id = match base {
             None => self.root_node_id,
             Some(base) => self.node_id(&base),
         };
 
-        self.graph.add_edge(base_id, node_id, ());
+        // Keep track of the name so we can navigate to/from it later
+        self.node_ids.insert(name, node_id);
 
-        self.migrations.insert(node_id, migration);
+        // Add the paths to base and back, both forward and reverse
+        self.graph.add_edge(
+            node_id,
+            base_id,
+            ops.iter().rev().map(|lens| lens.reversed()).collect(),
+        );
+        self.graph.add_edge(base_id, node_id, ops);
     }
 
-    pub fn migration_path(&self, from: Option<&str>, to: &str) -> Option<Vec<&Migration>> {
+    pub fn migration_path(&self, from: Option<&str>, to: &str) -> Option<Vec<&Lens>> {
         let source_node_id = match from {
             Some(from) => *self.node_ids.get(from)?,
             None => self.root_node_id,
@@ -76,12 +72,16 @@ impl Migrator {
             |_| 0,
         )
         .map(|(_, path)| {
-            path.iter()
-                // We skip the first migration because we assume we're already
-                // at the state given by `from`.
-                .skip(1)
-                .map(|&node_id| self.migrations.get(&node_id).unwrap())
-                .collect()
+            let mut out = Vec::with_capacity(path.len());
+
+            for (src, dest) in path.iter().zip(path.iter().skip(1)) {
+                self.graph
+                    .find_edge(*src, *dest)
+                    .and_then(|edge| self.graph.edge_weight(edge))
+                    .map(|ops| out.extend(ops));
+            }
+
+            out
         })
     }
 }
@@ -91,37 +91,60 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
+    macro_rules! lens {
+        ($patch:tt) => {
+            serde_json::from_value::<Lens>(serde_json::json!($patch)).unwrap()
+        };
+    }
+
     #[test]
     fn migration_path() {
         let mut migrator = Migrator::new();
 
         let name_a = "a";
+        let lens_a = lens!({"add": {
+            "name": "a",
+            "type": { "type": "string", "nullable": true },
+        }});
         let migration_a = Migration {
             name: name_a.to_string(),
             base: None,
-            ops: vec![],
+            ops: vec![lens_a.clone()],
         };
-        migrator.add_migration(name_a.to_string(), migration_a.clone());
+        migrator.add_migration(migration_a.clone());
 
         let name_b = "b";
+        let lens_b = lens!({"rename": {
+            "from": "a",
+            "to": "b"
+        }});
         let migration_b = Migration {
             name: name_b.to_string(),
             base: Some(name_a.to_string()),
-            ops: vec![],
+            ops: vec![lens_b.clone()],
         };
-        migrator.add_migration(name_b.to_string(), migration_b.clone());
+        migrator.add_migration(migration_b.clone());
 
         let name_c = "c";
+        let lens_c = lens!({"rename": {
+            "from": "b",
+            "to": "c"
+        }});
         let migration_c = Migration {
             name: name_c.to_string(),
             base: Some(name_b.to_string()),
-            ops: vec![],
+            ops: vec![lens_c.clone()],
         };
-        migrator.add_migration(name_c.to_string(), migration_c.clone());
+        migrator.add_migration(migration_c.clone());
 
-        let path = migrator.migration_path(None, name_c);
-        println!("{:#?}", path);
+        assert_eq!(
+            Some(vec![&lens_a, &lens_b, &lens_c]),
+            migrator.migration_path(None, name_c)
+        );
 
-        assert_eq!(path, Some(vec![&migration_a, &migration_b, &migration_c]));
+        assert_eq!(
+            Some(vec![&lens_c.reversed(), &lens_b.reversed()]),
+            migrator.migration_path(Some(name_c), name_a)
+        );
     }
 }
