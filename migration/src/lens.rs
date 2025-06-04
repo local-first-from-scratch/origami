@@ -1,6 +1,7 @@
+use jtd::{FromSerdeSchemaError, Schema, SerdeSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -30,7 +31,7 @@ pub enum Lens {
 pub struct AddRemove {
     pub name: String,
     #[serde(rename = "type")]
-    pub type_: jtd::SerdeSchema,
+    pub type_: SerdeSchema,
     #[serde(default = "null")]
     pub default: Value,
 }
@@ -70,8 +71,8 @@ pub struct Map {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Convert {
     pub name: String,
-    pub from_type: jtd::SerdeSchema,
-    pub to_type: jtd::SerdeSchema,
+    pub from_type: SerdeSchema,
+    pub to_type: SerdeSchema,
     pub forward: HashMap<Value, Value>,
     pub reverse: HashMap<Value, Value>,
 }
@@ -104,6 +105,128 @@ impl Lens {
                 forward: reverse.clone(),
                 reverse: forward.clone(),
             }),
+        }
+    }
+
+    pub fn transform_jtd(&self, schema: &mut jtd::Schema) -> Result<(), ApplyToJtdError> {
+        // First, we convert the schema to an object if it's empty.
+        if let Schema::Empty {
+            definitions,
+            metadata,
+        } = schema
+        {
+            *schema = Schema::Properties {
+                definitions: definitions.clone(),
+                metadata: metadata.clone(),
+                nullable: false,
+                properties: BTreeMap::new(),
+                optional_properties: BTreeMap::new(),
+                properties_is_present: false,
+                additional_properties: false,
+            };
+        }
+
+        // Next we modify!
+        if let Schema::Properties { properties, .. } = schema {
+            match self {
+                Lens::Add(add_remove) => todo!(),
+                Lens::Remove(add_remove) => todo!(),
+                Lens::Rename(Rename { from, to }) => {
+                    let existing = properties
+                        .remove(from)
+                        .ok_or(ApplyToJtdError::MissingRenameKey(from.clone()))?;
+
+                    properties.insert(to.clone(), existing);
+                }
+                Lens::Extract(extract_embed) => todo!(),
+                Lens::Embed(extract_embed) => todo!(),
+                Lens::Head(wrap_head) => todo!(),
+                Lens::Wrap(wrap_head) => todo!(),
+                Lens::In(_) => todo!(),
+                Lens::Map(map) => todo!(),
+                Lens::Convert(convert) => todo!(),
+            }
+
+            Ok(())
+        } else {
+            return Err(ApplyToJtdError::NotARecord);
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error, PartialEq)]
+pub enum ApplyToJtdError {
+    #[error("Problem with type schema: {0}")]
+    ConversionFromSerde(#[from] FromSerdeSchemaError),
+
+    #[error("We can only modify records")]
+    NotARecord,
+
+    #[error("Could not rename key {0}, it did not exist in the properties")]
+    MissingRenameKey(String),
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    macro_rules! schema {
+        ($patch:tt) => {
+            Schema::from_serde_schema(
+                serde_json::from_value::<SerdeSchema>(serde_json::json!($patch)).unwrap(),
+            )
+            .unwrap()
+        };
+    }
+
+    mod transform_jtd {
+        use super::*;
+        use pretty_assertions::assert_eq;
+
+        #[test]
+        fn rename_ok() {
+            let lens = Lens::Rename(Rename {
+                from: "old".to_string(),
+                to: "new".to_string(),
+            });
+
+            let mut schema = schema!({
+                "properties": {
+                    "old": {
+                        "type": "string"
+                    }
+                }
+            });
+
+            lens.transform_jtd(&mut schema).unwrap();
+
+            assert_eq!(
+                schema,
+                schema!({
+                    "properties": {
+                        "new": {
+                            "type": "string"
+                        }
+                    }
+                })
+            );
+        }
+
+        #[test]
+        fn rename_err() {
+            let lens = Lens::Rename(Rename {
+                from: "old".to_string(),
+                to: "new".to_string(),
+            });
+
+            let mut schema = schema!({"properties": {}});
+
+            let result = lens.transform_jtd(&mut schema);
+
+            assert_eq!(
+                result,
+                Err(ApplyToJtdError::MissingRenameKey("old".to_string()))
+            );
         }
     }
 }
