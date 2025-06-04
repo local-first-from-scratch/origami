@@ -1,28 +1,29 @@
 {
-  "name": "user.v3",
-  "base": "user.v2",
+	"name": "user.v3",
+	"base": "user.v2",
 
-  "ops": [
-    {
-      "rename": {
-        "from": "handle",
-        "to": "username"
-      }
-    },
-    {
-      "convert": {
-        "name": "status",
-        "from_type": "boolean",
-        "to_type": "string",
-        "forward": {
-          "true": "active",
-          "false": "inactive"
-        },
-        "reverse": {
-          "active": "true",
-          "inactive": "false"
-        }
-      }
-    }
-  ]
+	"ops": [
+		{
+			"rename": {
+				"from": "handle",
+				"to": "username"
+			}
+		},
+		{
+			"convert": {
+				"name": "status",
+				"from_type": { "type": "boolean", "nullable": false },
+				"to_type": { "enum": ["inactive", "active", "pending"] },
+				"forward": {
+					"false": "inactive",
+					"true": "active"
+				},
+				"reverse": {
+					"inactive": "false",
+					"pending": "false",
+					"active": "true"
+				}
+			}
+		}
+	]
 }
