@@ -151,7 +151,32 @@ impl Lens {
 
                     properties.insert(to.clone(), existing);
                 }
-                Lens::Extract(extract_embed) => todo!(),
+                Lens::Extract(extract_embed) => {
+                    let (host, mut existing) = properties
+                        .remove_entry(&extract_embed.host)
+                        .ok_or_else(|| {
+                            ApplyToJtdError::MissingExtractHost(extract_embed.host.clone())
+                        })?;
+
+                    if let Schema::Properties {
+                        properties: host_props,
+                        ..
+                    } = &mut existing
+                    {
+                        if let Some(definition) = host_props.remove(&extract_embed.name) {
+                            properties.insert(host, definition);
+                        } else {
+                            properties.insert(host.clone(), existing); // replace to not mangle object
+                            return Err(ApplyToJtdError::MissingExtractName(
+                                host,
+                                extract_embed.name.clone(),
+                            ));
+                        }
+                    } else {
+                        properties.insert(host, existing); // replace to not mangle object
+                        return Err(ApplyToJtdError::ExtractExpectedProperties);
+                    }
+                }
                 Lens::Embed(extract_embed) => todo!(),
                 Lens::Head(wrap_head) => todo!(),
                 Lens::Wrap(wrap_head) => todo!(),
@@ -183,6 +208,15 @@ pub enum ApplyToJtdError {
 
     #[error("Could not remove key {0}, it did not exist in the properties")]
     MissingRemoveKey(String),
+
+    #[error("Missing extract host {0}")]
+    MissingExtractHost(String),
+
+    #[error("Extract expected properties, but got something else")]
+    ExtractExpectedProperties,
+
+    #[error("Found host for {0} but not name {1}")]
+    MissingExtractName(String, String),
 }
 
 #[cfg(test)]
@@ -342,6 +376,106 @@ mod test {
                 result,
                 Err(ApplyToJtdError::MissingRemoveKey("missing".to_string()))
             );
+        }
+
+        #[test]
+        fn extract_ok() {
+            let lens = lens!({
+                "extract": {
+                    "host": "user",
+                    "name": "id",
+                }
+            });
+
+            let mut schema = schema!({
+                "properties": {
+                    "user": {
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            });
+
+            lens.transform_jtd(&mut schema).unwrap();
+
+            assert_eq!(
+                schema,
+                schema!({
+                    "properties": {
+                        "user": { "type": "string" }
+                    }
+                })
+            );
+        }
+
+        #[test]
+        fn extract_missing_host() {
+            let lens = lens!({
+                "extract": {
+                    "host": "user",
+                    "name": "irrelevant",
+                }
+            });
+
+            let mut schema = schema!({ "properties": {} });
+
+            let result = lens.transform_jtd(&mut schema);
+
+            assert_eq!(
+                Err(ApplyToJtdError::MissingExtractHost("user".to_string())),
+                result,
+            );
+        }
+
+        #[test]
+        fn extract_missing_name() {
+            let lens = lens!({
+                "extract": {
+                    "host": "user",
+                    "name": "id",
+                }
+            });
+
+            let mut schema = schema!({
+                "properties": {
+                    "user": {
+                        "properties": {}
+                    }
+                }
+            });
+
+            let result = lens.transform_jtd(&mut schema);
+
+            assert_eq!(
+                Err(ApplyToJtdError::MissingExtractName(
+                    "user".to_string(),
+                    "id".to_string()
+                )),
+                result,
+            );
+        }
+
+        #[test]
+        fn extract_wrong_type() {
+            let lens = lens!({
+                "extract": {
+                    "host": "user",
+                    "name": "id",
+                }
+            });
+
+            let mut schema = schema!({
+                "properties": {
+                    "user": { "type": "string" }
+                }
+            });
+
+            let result = lens.transform_jtd(&mut schema);
+
+            assert_eq!(Err(ApplyToJtdError::ExtractExpectedProperties), result,);
         }
     }
 }
