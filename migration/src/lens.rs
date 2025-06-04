@@ -139,11 +139,15 @@ impl Lens {
                         Schema::from_serde_schema(add_remove.type_.clone())?,
                     );
                 }
-                Lens::Remove(add_remove) => todo!(),
+                Lens::Remove(add_remove) => {
+                    properties.remove(&add_remove.name).ok_or_else(|| {
+                        ApplyToJtdError::MissingRemoveKey(add_remove.name.clone())
+                    })?;
+                }
                 Lens::Rename(Rename { from, to }) => {
                     let existing = properties
                         .remove(from)
-                        .ok_or(ApplyToJtdError::MissingRenameKey(from.clone()))?;
+                        .ok_or_else(|| ApplyToJtdError::MissingRenameKey(from.clone()))?;
 
                     properties.insert(to.clone(), existing);
                 }
@@ -176,6 +180,9 @@ pub enum ApplyToJtdError {
 
     #[error("Could not add key {0}, it already exists in the properties")]
     KeyConflict(String),
+
+    #[error("Could not remove key {0}, it did not exist in the properties")]
+    MissingRemoveKey(String),
 }
 
 #[cfg(test)]
@@ -294,6 +301,47 @@ mod test {
             let result = lens.transform_jtd(&mut schema);
 
             assert_eq!(result, Err(ApplyToJtdError::KeyConflict("new".to_string())));
+        }
+
+        #[test]
+        fn remove_ok() {
+            let lens = lens!({
+                "remove": {
+                    "name": "old",
+                    "type": { "type": "string" },
+                }
+            });
+
+            let mut schema = schema!({
+                "properties": {
+                    "old": {
+                        "type": "string"
+                    }
+                }
+            });
+
+            lens.transform_jtd(&mut schema).unwrap();
+
+            assert_eq!(schema, schema!({ "properties": {} }));
+        }
+
+        #[test]
+        fn remove_missing() {
+            let lens = lens!({
+                "remove": {
+                    "name": "missing",
+                    "type": { "type": "string" },
+                }
+            });
+
+            let mut schema = schema!({ "properties": {} });
+
+            let result = lens.transform_jtd(&mut schema);
+
+            assert_eq!(
+                result,
+                Err(ApplyToJtdError::MissingRemoveKey("missing".to_string()))
+            );
         }
     }
 }
