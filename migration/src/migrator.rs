@@ -10,8 +10,6 @@ pub struct Migrator {
     graph: Graph<(), Vec<Lens>, Directed>,
 }
 
-const ROOT_ID: &str = "ROOT";
-
 impl Migrator {
     pub fn new() -> Self {
         let mut graph = Graph::new();
