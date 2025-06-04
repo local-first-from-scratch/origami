@@ -10,6 +10,12 @@ pub struct Migrator {
     graph: Graph<(), Vec<Lens>, Directed>,
 }
 
+impl Default for Migrator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Migrator {
     pub fn new() -> Self {
         let mut graph = Graph::new();
@@ -73,10 +79,13 @@ impl Migrator {
             let mut out = Vec::with_capacity(path.len());
 
             for (src, dest) in path.iter().zip(path.iter().skip(1)) {
-                self.graph
+                if let Some(ops) = self
+                    .graph
                     .find_edge(*src, *dest)
                     .and_then(|edge| self.graph.edge_weight(edge))
-                    .map(|ops| out.extend(ops));
+                {
+                    out.extend(ops)
+                }
             }
 
             out

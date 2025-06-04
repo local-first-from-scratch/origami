@@ -40,7 +40,7 @@ impl Cli {
                 continue;
             }
 
-            let file = std::fs::File::open(&entry.path())
+            let file = std::fs::File::open(entry.path())
                 .wrap_err_with(|| format!("could not open file {}", entry.path().display()))?;
             let migration: Migration = serde_json::from_reader(file).wrap_err_with(|| {
                 format!("could not parse migration {}", entry.path().display())
