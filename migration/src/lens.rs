@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(rename_all = "lowercase")]
+#[allow(clippy::large_enum_variant)] // TODO: measure memory use and revisit
 pub enum Lens {
     Add(AddRemove),
     Remove(AddRemove),
