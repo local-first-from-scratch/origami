@@ -119,6 +119,7 @@ In this case, you'd end up with this.
 {
   "user": 1234
 }
+```
 
 This brings us to the main limitation of this migration: all the other keys in the embedded object will be unavailable after an `extract` migration. So, if you ran that migration in reverse, you'd end up with:
 
