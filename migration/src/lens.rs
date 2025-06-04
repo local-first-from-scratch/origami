@@ -129,7 +129,16 @@ impl Lens {
         // Next we modify!
         if let Schema::Properties { properties, .. } = schema {
             match self {
-                Lens::Add(add_remove) => todo!(),
+                Lens::Add(add_remove) => {
+                    if properties.contains_key(&add_remove.name) {
+                        return Err(ApplyToJtdError::KeyConflict(add_remove.name.clone()));
+                    }
+
+                    properties.insert(
+                        add_remove.name.clone(),
+                        Schema::from_serde_schema(add_remove.type_.clone())?,
+                    );
+                }
                 Lens::Remove(add_remove) => todo!(),
                 Lens::Rename(Rename { from, to }) => {
                     let existing = properties
@@ -164,11 +173,20 @@ pub enum ApplyToJtdError {
 
     #[error("Could not rename key {0}, it did not exist in the properties")]
     MissingRenameKey(String),
+
+    #[error("Could not add key {0}, it already exists in the properties")]
+    KeyConflict(String),
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+
+    macro_rules! lens {
+        ($patch:tt) => {
+            serde_json::from_value::<Lens>(serde_json::json!($patch)).unwrap()
+        };
+    }
 
     macro_rules! schema {
         ($patch:tt) => {
@@ -227,6 +245,55 @@ mod test {
                 result,
                 Err(ApplyToJtdError::MissingRenameKey("old".to_string()))
             );
+        }
+
+        #[test]
+        fn add_ok() {
+            let lens = lens!({
+                "add": {
+                    "name": "new",
+                    "type": {"type": "string"}
+                }
+            });
+
+            let mut schema = schema!({"properties": {}});
+
+            lens.transform_jtd(&mut schema).unwrap();
+
+            assert_eq!(
+                schema,
+                schema!({
+                    "properties": {
+                        "new": {
+                            "type": "string"
+                        }
+                    }
+                })
+            );
+        }
+
+        #[test]
+        fn add_conflict() {
+            let lens = lens!({
+                "add": {
+                    "name": "new",
+                    "type": {"type": "string"}
+                }
+            });
+
+            let mut schema = schema!({
+                "properties": {
+                    "new": {
+                        // It doesn't matter if the type is the same, we need to
+                        // not add duplicates.
+                        "type": "string"
+                    }
+                }
+            });
+
+            let result = lens.transform_jtd(&mut schema);
+
+            assert_eq!(result, Err(ApplyToJtdError::KeyConflict("new".to_string())));
         }
     }
 }
