@@ -113,7 +113,7 @@ impl Lens {
         }
     }
 
-    pub fn transform_jtd(&self, schema: &mut jtd::Schema) -> Result<(), ApplyToJtdError> {
+    pub fn transform_jtd(&self, schema: &mut jtd::Schema) -> Result<(), TransformJtdError> {
         // First, we convert the schema to an object if it's empty.
         if let Schema::Empty {
             definitions,
@@ -136,7 +136,7 @@ impl Lens {
             match self {
                 Lens::Add(add_remove) => {
                     if properties.contains_key(&add_remove.name) {
-                        return Err(ApplyToJtdError::KeyConflict(add_remove.name.clone()));
+                        return Err(TransformJtdError::KeyConflict(add_remove.name.clone()));
                     }
 
                     properties.insert(
@@ -146,13 +146,13 @@ impl Lens {
                 }
                 Lens::Remove(add_remove) => {
                     properties.remove(&add_remove.name).ok_or_else(|| {
-                        ApplyToJtdError::MissingRemoveKey(add_remove.name.clone())
+                        TransformJtdError::MissingName(self.name(), add_remove.name.clone())
                     })?;
                 }
                 Lens::Rename(Rename { from, to }) => {
                     let existing = properties
                         .remove(from)
-                        .ok_or_else(|| ApplyToJtdError::MissingRenameKey(from.clone()))?;
+                        .ok_or_else(|| TransformJtdError::MissingName(self.name(), from.clone()))?;
 
                     properties.insert(to.clone(), existing);
                 }
@@ -160,7 +160,7 @@ impl Lens {
                     let (host, mut existing) = properties
                         .remove_entry(&extract_embed.host)
                         .ok_or_else(|| {
-                            ApplyToJtdError::MissingExtractHost(extract_embed.host.clone())
+                            TransformJtdError::MissingName(self.name(), extract_embed.host.clone())
                         })?;
 
                     if let Schema::Properties {
@@ -172,14 +172,23 @@ impl Lens {
                             properties.insert(host, definition);
                         } else {
                             properties.insert(host.clone(), existing); // replace so we don't mangle input object
-                            return Err(ApplyToJtdError::MissingExtractName(
-                                host,
-                                extract_embed.name.clone(),
+                            return Err(TransformJtdError::Within(
+                                extract_embed.host.clone(),
+                                Box::new(TransformJtdError::MissingName(
+                                    self.name(),
+                                    extract_embed.name.clone(),
+                                )),
                             ));
                         }
                     } else {
+                        let err = Err(TransformJtdError::ExpectedXGotY(
+                            self.name(),
+                            "properties",
+                            schema_name(&existing),
+                        ));
+
                         properties.insert(host, existing); // replace so we don't mangle input object
-                        return Err(ApplyToJtdError::ExtractExpectedProperties);
+                        return err;
                     }
                 }
                 Lens::Embed(extract_embed) => {
@@ -200,7 +209,8 @@ impl Lens {
                             },
                         );
                     } else {
-                        return Err(ApplyToJtdError::MissingEmbedName(
+                        return Err(TransformJtdError::MissingName(
+                            self.name(),
                             extract_embed.host.clone(),
                         ));
                     }
@@ -208,13 +218,19 @@ impl Lens {
                 Lens::Head(WrapHead { name }) => {
                     let (host, existing) = properties
                         .remove_entry(name)
-                        .ok_or_else(|| ApplyToJtdError::MissingHeadName(name.clone()))?;
+                        .ok_or_else(|| TransformJtdError::MissingName(self.name(), name.clone()))?;
 
                     if let Schema::Elements { elements, .. } = existing {
                         properties.insert(host, *elements);
                     } else {
+                        let err = TransformJtdError::ExpectedXGotY(
+                            self.name(),
+                            "elements",
+                            schema_name(&existing),
+                        );
+
                         properties.insert(host, existing); // replace so we don't mangle input object
-                        return Err(ApplyToJtdError::HeadExpectedElements);
+                        return Err(err);
                     }
                 }
                 Lens::Wrap(WrapHead { name }) => {
@@ -229,18 +245,21 @@ impl Lens {
                             },
                         );
                     } else {
-                        return Err(ApplyToJtdError::MissingWrapName(name.clone()));
+                        return Err(TransformJtdError::MissingName(self.name(), name.clone()));
                     }
                 }
                 Lens::In(in_) => {
                     if let Some(prop) = properties.get_mut(&in_.name) {
                         for op in &in_.ops {
                             op.transform_jtd(prop).map_err(|err| {
-                                ApplyToJtdError::CouldNotApplyIn(in_.name.clone(), Box::new(err))
+                                TransformJtdError::Within(in_.name.clone(), Box::new(err))
                             })?;
                         }
                     } else {
-                        return Err(ApplyToJtdError::MissingInName(in_.name.clone()));
+                        return Err(TransformJtdError::MissingName(
+                            self.name(),
+                            in_.name.clone(),
+                        ));
                     }
                 }
                 Lens::Map(_map) => todo!(),
@@ -249,54 +268,59 @@ impl Lens {
 
             Ok(())
         } else {
-            Err(ApplyToJtdError::NotARecord)
+            Err(TransformJtdError::ExpectedXGotY(
+                self.name(),
+                "properties",
+                schema_name(schema),
+            ))
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        match self {
+            Lens::Add(..) => "add",
+            Lens::Remove(..) => "remove",
+            Lens::Rename(..) => "rename",
+            Lens::Extract(..) => "extract",
+            Lens::Embed(..) => "embed",
+            Lens::Head(..) => "head",
+            Lens::Wrap(..) => "wrap",
+            Lens::In(..) => "in",
+            Lens::Map(..) => "map",
+            Lens::Convert(..) => "convert",
         }
     }
 }
 
+fn schema_name(schema: &jtd::Schema) -> &'static str {
+    match schema {
+        Schema::Empty { .. } => "empty",
+        Schema::Ref { .. } => "ref",
+        Schema::Type { .. } => "type",
+        Schema::Enum { .. } => "enum",
+        Schema::Elements { .. } => "elements",
+        Schema::Properties { .. } => "properties",
+        Schema::Values { .. } => "values",
+        Schema::Discriminator { .. } => "discriminator",
+    }
+}
+
 #[derive(Debug, thiserror::Error, PartialEq)]
-pub enum ApplyToJtdError {
+pub enum TransformJtdError {
     #[error("Problem with type schema: {0}")]
     ConversionFromSerde(#[from] FromSerdeSchemaError),
 
-    #[error("We can only modify records")]
-    NotARecord,
+    #[error("`{0}` lens expected `{0}`, but got a `{1}` instead.")]
+    ExpectedXGotY(&'static str, &'static str, &'static str),
 
-    #[error("Could not rename key {0}, it did not exist in the properties")]
-    MissingRenameKey(String),
+    #[error("`{0}` lens expected a name `{1}`, but it was not present in the properties.")]
+    MissingName(&'static str, String),
+
+    #[error("In `{0}`: {1}")]
+    Within(String, Box<TransformJtdError>),
 
     #[error("Could not add key {0}, it already exists in the properties")]
     KeyConflict(String),
-
-    #[error("Could not remove key {0}, it did not exist in the properties")]
-    MissingRemoveKey(String),
-
-    #[error("Missing extract host {0}")]
-    MissingExtractHost(String),
-
-    #[error("Extract expected properties, but got something else")]
-    ExtractExpectedProperties,
-
-    #[error("Found host for {0} but not name {1}")]
-    MissingExtractName(String, String),
-
-    #[error("Missing embed host {0}")]
-    MissingEmbedName(String),
-
-    #[error("Missing field while trying to extract the head {0}")]
-    MissingHeadName(String),
-
-    #[error("Head expected elements, but got something else")]
-    HeadExpectedElements,
-
-    #[error("Missing wrap host {0}")]
-    MissingWrapName(String),
-
-    #[error("Missing `in` name {0}")]
-    MissingInName(String),
-
-    #[error("Problem applying `in` at {0}: {1}")]
-    CouldNotApplyIn(String, Box<ApplyToJtdError>),
 }
 
 #[cfg(test)]
@@ -364,7 +388,7 @@ mod test {
 
             assert_eq!(
                 result,
-                Err(ApplyToJtdError::MissingRenameKey("old".to_string()))
+                Err(TransformJtdError::MissingName("rename", "old".to_string()))
             );
         }
 
@@ -414,7 +438,10 @@ mod test {
 
             let result = lens.transform_jtd(&mut schema);
 
-            assert_eq!(result, Err(ApplyToJtdError::KeyConflict("new".to_string())));
+            assert_eq!(
+                result,
+                Err(TransformJtdError::KeyConflict("new".to_string()))
+            );
         }
 
         #[test]
@@ -454,7 +481,10 @@ mod test {
 
             assert_eq!(
                 result,
-                Err(ApplyToJtdError::MissingRemoveKey("missing".to_string()))
+                Err(TransformJtdError::MissingName(
+                    "remove",
+                    "missing".to_string()
+                ))
             );
         }
 
@@ -505,7 +535,10 @@ mod test {
             let result = lens.transform_jtd(&mut schema);
 
             assert_eq!(
-                Err(ApplyToJtdError::MissingExtractHost("user".to_string())),
+                Err(TransformJtdError::MissingName(
+                    "extract",
+                    "user".to_string()
+                )),
                 result,
             );
         }
@@ -530,9 +563,9 @@ mod test {
             let result = lens.transform_jtd(&mut schema);
 
             assert_eq!(
-                Err(ApplyToJtdError::MissingExtractName(
+                Err(TransformJtdError::Within(
                     "user".to_string(),
-                    "id".to_string()
+                    Box::new(TransformJtdError::MissingName("extract", "id".to_string())),
                 )),
                 result,
             );
@@ -555,7 +588,14 @@ mod test {
 
             let result = lens.transform_jtd(&mut schema);
 
-            assert_eq!(Err(ApplyToJtdError::ExtractExpectedProperties), result);
+            assert_eq!(
+                Err(TransformJtdError::ExpectedXGotY(
+                    "extract",
+                    "properties",
+                    "type"
+                )),
+                result
+            );
         }
 
         #[test]
@@ -635,7 +675,7 @@ mod test {
 
             assert_eq!(
                 result,
-                Err(ApplyToJtdError::MissingEmbedName("user".into()))
+                Err(TransformJtdError::MissingName("embed", "user".into()))
             );
         }
 
@@ -685,7 +725,7 @@ mod test {
 
             assert_eq!(
                 result,
-                Err(ApplyToJtdError::MissingHeadName("items".to_string()))
+                Err(TransformJtdError::MissingName("head", "items".to_string()))
             );
         }
 
@@ -707,7 +747,10 @@ mod test {
 
             let result = lens.transform_jtd(&mut schema);
 
-            assert_eq!(result, Err(ApplyToJtdError::HeadExpectedElements));
+            assert_eq!(
+                result,
+                Err(TransformJtdError::ExpectedXGotY("head", "elements", "type"))
+            );
         }
 
         #[test]
@@ -756,7 +799,7 @@ mod test {
 
             assert_eq!(
                 result,
-                Err(ApplyToJtdError::MissingWrapName("items".to_string()))
+                Err(TransformJtdError::MissingName("wrap", "items".to_string()))
             );
         }
 
@@ -824,7 +867,7 @@ mod test {
 
             assert_eq!(
                 result,
-                Err(ApplyToJtdError::MissingInName("user".to_string()))
+                Err(TransformJtdError::MissingName("in", "user".to_string()))
             );
         }
 
@@ -854,9 +897,10 @@ mod test {
 
             assert_eq!(
                 result,
-                Err(ApplyToJtdError::CouldNotApplyIn(
+                Err(TransformJtdError::Within(
                     "user".to_string(),
-                    Box::new(ApplyToJtdError::MissingRenameKey(
+                    Box::new(TransformJtdError::MissingName(
+                        "rename",
                         "nonexistent_field".to_string()
                     ))
                 ))
