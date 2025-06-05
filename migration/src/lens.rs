@@ -177,7 +177,29 @@ impl Lens {
                         return Err(ApplyToJtdError::ExtractExpectedProperties);
                     }
                 }
-                Lens::Embed(_extract_embed) => todo!(),
+                Lens::Embed(extract_embed) => {
+                    if let Some(definition) = properties.remove(&extract_embed.host) {
+                        properties.insert(
+                            extract_embed.host.clone(),
+                            Schema::Properties {
+                                definitions: BTreeMap::new(),
+                                metadata: BTreeMap::new(),
+                                nullable: false,
+                                properties: BTreeMap::from([(
+                                    extract_embed.name.clone(),
+                                    definition,
+                                )]),
+                                additional_properties: false,
+                                optional_properties: BTreeMap::new(),
+                                properties_is_present: true,
+                            },
+                        );
+                    } else {
+                        return Err(ApplyToJtdError::MissingEmbedName(
+                            extract_embed.host.clone(),
+                        ));
+                    }
+                }
                 Lens::Head(_wrap_head) => todo!(),
                 Lens::Wrap(_wrap_head) => todo!(),
                 Lens::In(_) => todo!(),
@@ -217,6 +239,9 @@ pub enum ApplyToJtdError {
 
     #[error("Found host for {0} but not name {1}")]
     MissingExtractName(String, String),
+
+    #[error("Missing embed host {0}")]
+    MissingEmbedName(String),
 }
 
 #[cfg(test)]
@@ -475,7 +500,88 @@ mod test {
 
             let result = lens.transform_jtd(&mut schema);
 
-            assert_eq!(Err(ApplyToJtdError::ExtractExpectedProperties), result,);
+            assert_eq!(Err(ApplyToJtdError::ExtractExpectedProperties), result);
+        }
+
+        #[test]
+        fn embed_ok() {
+            let lens = lens!({
+                "embed": {
+                    "host": "user",
+                    "name": "id",
+                }
+            });
+
+            let mut schema = schema!({
+                "properties": {
+                    "user": { "type": "string" }
+                }
+            });
+
+            lens.transform_jtd(&mut schema).unwrap();
+
+            assert_eq!(
+                schema!({
+                    "properties": {
+                        "user": {
+                            "properties": {
+                                "id": { "type": "string" }
+                            }
+                        }
+                    }
+                }),
+                schema,
+            );
+        }
+
+        #[test]
+        fn test_embed_missing_host() {
+            let lens = lens!({
+                "embed": {
+                    "host": "user",
+                    "name": "id",
+                }
+            });
+
+            let mut schema = schema!({
+                "properties": {
+                    "user": { "type": "string" }
+                }
+            });
+
+            lens.transform_jtd(&mut schema).unwrap();
+
+            assert_eq!(
+                schema!({
+                    "properties": {
+                        "user": {
+                            "properties": {
+                                "id": { "type": "string" }
+                            }
+                        }
+                    }
+                }),
+                schema,
+            );
+        }
+
+        #[test]
+        fn test_embed_missing_name() {
+            let lens = lens!({
+                "embed": {
+                    "host": "user",
+                    "name": "id",
+                }
+            });
+
+            let mut schema = schema!({ "properties": { } });
+
+            let result = lens.transform_jtd(&mut schema);
+
+            assert_eq!(
+                result,
+                Err(ApplyToJtdError::MissingEmbedName("user".into()))
+            );
         }
     }
 }
