@@ -178,9 +178,9 @@ impl Lens {
                     }
                 }
                 Lens::Embed(extract_embed) => {
-                    if let Some(definition) = properties.remove(&extract_embed.host) {
+                    if let Some((host, definition)) = properties.remove_entry(&extract_embed.host) {
                         properties.insert(
-                            extract_embed.host.clone(),
+                            host,
                             Schema::Properties {
                                 definitions: BTreeMap::new(),
                                 metadata: BTreeMap::new(),
