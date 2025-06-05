@@ -166,14 +166,14 @@ impl Lens {
                         if let Some(definition) = host_props.remove(&extract_embed.name) {
                             properties.insert(host, definition);
                         } else {
-                            properties.insert(host.clone(), existing); // replace to not mangle object
+                            properties.insert(host.clone(), existing); // replace so we don't mangle input object
                             return Err(ApplyToJtdError::MissingExtractName(
                                 host,
                                 extract_embed.name.clone(),
                             ));
                         }
                     } else {
-                        properties.insert(host, existing); // replace to not mangle object
+                        properties.insert(host, existing); // replace so we don't mangle input object
                         return Err(ApplyToJtdError::ExtractExpectedProperties);
                     }
                 }
@@ -200,7 +200,18 @@ impl Lens {
                         ));
                     }
                 }
-                Lens::Head(_wrap_head) => todo!(),
+                Lens::Head(WrapHead { name }) => {
+                    let (host, existing) = properties
+                        .remove_entry(name)
+                        .ok_or_else(|| ApplyToJtdError::MissingHeadName(name.clone()))?;
+
+                    if let Schema::Elements { elements, .. } = existing {
+                        properties.insert(host, *elements);
+                    } else {
+                        properties.insert(host, existing); // replace so we don't mangle input object
+                        return Err(ApplyToJtdError::HeadExpectedElements);
+                    }
+                }
                 Lens::Wrap(_wrap_head) => todo!(),
                 Lens::In(_) => todo!(),
                 Lens::Map(_map) => todo!(),
@@ -242,6 +253,12 @@ pub enum ApplyToJtdError {
 
     #[error("Missing embed host {0}")]
     MissingEmbedName(String),
+
+    #[error("Missing field while trying to extract the head {0}")]
+    MissingHeadName(String),
+
+    #[error("Head expected elements, but got something else")]
+    HeadExpectedElements,
 }
 
 #[cfg(test)]
@@ -582,6 +599,77 @@ mod test {
                 result,
                 Err(ApplyToJtdError::MissingEmbedName("user".into()))
             );
+        }
+
+        #[test]
+        fn head_ok() {
+            let lens = lens!({
+                "head": {
+                    "name": "items",
+                }
+            });
+
+            let mut schema = schema!({
+                "properties": {
+                    "items": {
+                        "elements": {
+                            "type": "string"
+                        }
+                    }
+                }
+            });
+
+            lens.transform_jtd(&mut schema).unwrap();
+
+            assert_eq!(
+                schema,
+                schema!({
+                    "properties": {
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                })
+            );
+        }
+
+        #[test]
+        fn head_missing_name() {
+            let lens = lens!({
+                "head": {
+                    "name": "items",
+                }
+            });
+
+            let mut schema = schema!({ "properties": {} });
+
+            let result = lens.transform_jtd(&mut schema);
+
+            assert_eq!(
+                result,
+                Err(ApplyToJtdError::MissingHeadName("items".to_string()))
+            );
+        }
+
+        #[test]
+        fn head_wrong_type() {
+            let lens = lens!({
+                "head": {
+                    "name": "items",
+                }
+            });
+
+            let mut schema = schema!({
+                "properties": {
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            });
+
+            let result = lens.transform_jtd(&mut schema);
+
+            assert_eq!(result, Err(ApplyToJtdError::HeadExpectedElements));
         }
     }
 }
