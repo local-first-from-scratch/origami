@@ -232,7 +232,17 @@ impl Lens {
                         return Err(ApplyToJtdError::MissingWrapName(name.clone()));
                     }
                 }
-                Lens::In(_) => todo!(),
+                Lens::In(in_) => {
+                    if let Some(prop) = properties.get_mut(&in_.name) {
+                        for op in &in_.ops {
+                            op.transform_jtd(prop).map_err(|err| {
+                                ApplyToJtdError::CouldNotApplyIn(in_.name.clone(), Box::new(err))
+                            })?;
+                        }
+                    } else {
+                        return Err(ApplyToJtdError::MissingInName(in_.name.clone()));
+                    }
+                }
                 Lens::Map(_map) => todo!(),
                 Lens::Convert(_convert) => todo!(),
             }
@@ -281,6 +291,12 @@ pub enum ApplyToJtdError {
 
     #[error("Missing wrap host {0}")]
     MissingWrapName(String),
+
+    #[error("Missing `in` name {0}")]
+    MissingInName(String),
+
+    #[error("Problem applying `in` at {0}: {1}")]
+    CouldNotApplyIn(String, Box<ApplyToJtdError>),
 }
 
 #[cfg(test)]
@@ -741,6 +757,109 @@ mod test {
             assert_eq!(
                 result,
                 Err(ApplyToJtdError::MissingWrapName("items".to_string()))
+            );
+        }
+
+        #[test]
+        fn in_ok() {
+            let lens = lens!({
+                "in": {
+                    "name": "user",
+                    "ops": [{
+                        "rename": {
+                            "from": "old_field",
+                            "to": "new_field"
+                        }
+                    }]
+                }
+            });
+
+            let mut schema = schema!({
+                "properties": {
+                    "user": {
+                        "properties": {
+                            "old_field": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            });
+
+            lens.transform_jtd(&mut schema).unwrap();
+
+            assert_eq!(
+                schema,
+                schema!({
+                    "properties": {
+                        "user": {
+                            "properties": {
+                                "new_field": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                })
+            );
+        }
+
+        #[test]
+        fn in_missing_name() {
+            let lens = lens!({
+                "in": {
+                    "name": "user",
+                    "ops": [{
+                        "rename": {
+                            "from": "old_field",
+                            "to": "new_field"
+                        }
+                    }]
+                }
+            });
+
+            let mut schema = schema!({ "properties": {} });
+
+            let result = lens.transform_jtd(&mut schema);
+
+            assert_eq!(
+                result,
+                Err(ApplyToJtdError::MissingInName("user".to_string()))
+            );
+        }
+
+        #[test]
+        fn in_problem_with_inner_lens() {
+            let lens = lens!({
+                "in": {
+                    "name": "user",
+                    "ops": [{
+                        "rename": {
+                            "from": "nonexistent_field",
+                            "to": "new_field"
+                        }
+                    }]
+                }
+            });
+
+            let mut schema = schema!({
+                "properties": {
+                    "user": {
+                        "properties": {}
+                    }
+                }
+            });
+
+            let result = lens.transform_jtd(&mut schema);
+
+            assert_eq!(
+                result,
+                Err(ApplyToJtdError::CouldNotApplyIn(
+                    "user".to_string(),
+                    Box::new(ApplyToJtdError::MissingRenameKey(
+                        "nonexistent_field".to_string()
+                    ))
+                ))
             );
         }
     }
