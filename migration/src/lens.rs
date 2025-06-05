@@ -90,8 +90,13 @@ impl Lens {
             Lens::Embed(extract_embed) => Lens::Embed(extract_embed.clone()),
             Lens::Head(wrap_head) => Lens::Wrap(wrap_head.clone()),
             Lens::Wrap(wrap_head) => Lens::Head(wrap_head.clone()),
-            Lens::In(..) => self.clone(),
-            Lens::Map(..) => self.clone(),
+            Lens::In(in_) => Lens::In(In {
+                name: in_.name.clone(),
+                ops: in_.ops.iter().rev().map(|lens| lens.reversed()).collect(),
+            }),
+            Lens::Map(map) => Lens::Map(Map {
+                ops: map.ops.iter().rev().map(|lens| lens.reversed()).collect(),
+            }),
             Lens::Convert(Convert {
                 name,
                 from_type,
