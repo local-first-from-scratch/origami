@@ -212,7 +212,21 @@ impl Lens {
                         return Err(ApplyToJtdError::HeadExpectedElements);
                     }
                 }
-                Lens::Wrap(_wrap_head) => todo!(),
+                Lens::Wrap(WrapHead { name }) => {
+                    if let Some((host, definition)) = properties.remove_entry(name) {
+                        properties.insert(
+                            host,
+                            Schema::Elements {
+                                definitions: BTreeMap::new(),
+                                metadata: BTreeMap::new(),
+                                nullable: false,
+                                elements: Box::new(definition),
+                            },
+                        );
+                    } else {
+                        return Err(ApplyToJtdError::MissingWrapName(name.clone()));
+                    }
+                }
                 Lens::In(_) => todo!(),
                 Lens::Map(_map) => todo!(),
                 Lens::Convert(_convert) => todo!(),
@@ -259,6 +273,9 @@ pub enum ApplyToJtdError {
 
     #[error("Head expected elements, but got something else")]
     HeadExpectedElements,
+
+    #[error("Missing wrap host {0}")]
+    MissingWrapName(String),
 }
 
 #[cfg(test)]
@@ -670,6 +687,56 @@ mod test {
             let result = lens.transform_jtd(&mut schema);
 
             assert_eq!(result, Err(ApplyToJtdError::HeadExpectedElements));
+        }
+
+        #[test]
+        fn wrap_ok() {
+            let lens = lens!({
+                "wrap": {
+                    "name": "items",
+                }
+            });
+
+            let mut schema = schema!({
+                "properties": {
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            });
+
+            lens.transform_jtd(&mut schema).unwrap();
+
+            assert_eq!(
+                schema,
+                schema!({
+                    "properties": {
+                        "items": {
+                            "elements": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                })
+            );
+        }
+
+        #[test]
+        fn wrap_missing_name() {
+            let lens = lens!({
+                "wrap": {
+                    "name": "items",
+                }
+            });
+
+            let mut schema = schema!({ "properties": {} });
+
+            let result = lens.transform_jtd(&mut schema);
+
+            assert_eq!(
+                result,
+                Err(ApplyToJtdError::MissingWrapName("items".to_string()))
+            );
         }
     }
 }
