@@ -1,27 +1,20 @@
 {
-	"name": "user.v1",
+  "name": "user.v1",
 
-	"ops": [
-		{
-			"add": {
-				"name": "handle",
-				"type": { "type": "string", "nullable": false },
-				"default": ""
-			}
-		},
-		{
-			"add": {
-				"name": "email",
-				"type": { "type": "string", "nullable": false },
-				"default": ""
-			}
-		},
-		{
-			"add": {
-				"name": "status",
-				"type": { "type": "boolean", "nullable": false },
-				"default": true
-			}
-		}
-	]
+  "ops": [
+    {
+      "add": {
+        "name": "handle",
+        "type": { "type": "string", "nullable": false },
+        "default": ""
+      }
+    },
+    {
+      "add": {
+        "name": "email",
+        "type": { "type": "string", "nullable": false },
+        "default": ""
+      }
+    }
+  ]
 }

@@ -4,6 +4,13 @@
 
   "ops": [
     {
+      "add": {
+        "name": "status",
+        "type": { "type": "boolean", "nullable": false },
+        "default": true
+      }
+    },
+    {
       "rename": {
         "from": "handle",
         "to": "username"
