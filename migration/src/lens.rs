@@ -299,7 +299,27 @@ impl Lens {
                 schema_name(schema),
             )),
 
-            (Lens::Convert(_convert), _) => todo!(),
+            (Lens::Convert(convert), Schema::Properties { properties, .. }) => {
+                if let Some(prop) = properties.get_mut(&convert.name) {
+                    let expected_type = Schema::from_serde_schema(convert.from_type.clone())?;
+
+                    if prop == &expected_type {
+                        *prop = Schema::from_serde_schema(convert.to_type.clone())?;
+
+                        Ok(())
+                    } else {
+                        Err(TransformJtdError::WrongTypeForTransform(
+                            expected_type,
+                            prop.clone(),
+                        ))
+                    }
+                } else {
+                    Err(TransformJtdError::MissingName(
+                        self.name(),
+                        convert.name.clone(),
+                    ))
+                }
+            }
 
             (_, schema) => Err(TransformJtdError::ExpectedXGotY(
                 self.name(),
@@ -354,6 +374,9 @@ pub enum TransformJtdError {
 
     #[error("Could not add key {0}, it already exists in the properties")]
     KeyConflict(String),
+
+    #[error("Got the wrong source type for `transform`. Expected `{0:?}`, got `{1:?}`.")]
+    WrongTypeForTransform(Schema, Schema),
 }
 
 #[cfg(test)]
@@ -1008,6 +1031,74 @@ mod test {
                     "map",
                     "elements",
                     "properties"
+                ))
+            );
+        }
+
+        #[test]
+        fn convert_ok() {
+            let lens = lens!({
+                "convert": {
+                    "name": "status",
+                    "from_type": {"type": "string"},
+                    "to_type": {"type": "int32"},
+                    "forward": {"active": 1, "inactive": 0},
+                    "reverse": {"1": "active", "0": "inactive"}
+                }
+            });
+
+            let mut schema = schema!({
+                "properties": {
+                    "status": {
+                        "type": "string"
+                    }
+                }
+            });
+
+            lens.transform_jtd(&mut schema).unwrap();
+
+            assert_eq!(
+                schema,
+                schema!({
+                    "properties": {
+                        "status": {
+                            "type": "int32"
+                        }
+                    }
+                })
+            );
+        }
+
+        #[test]
+        fn convert_wrong_type() {
+            let lens = lens!({
+                "convert": {
+                    "name": "status",
+                    "from_type": {"type": "string"},
+                    "to_type": {"type": "int32"},
+                    "forward": {"active": 1, "inactive": 0},
+                    "reverse": {"1": "active", "0": "inactive"}
+                }
+            });
+
+            let mut schema = schema!({
+                "properties": {
+                    "status": {
+                        "type": "int32"
+                    }
+                }
+            });
+
+            let result = lens.transform_jtd(&mut schema);
+
+            let expected_type = schema!({"type": "string"});
+            let actual_type = schema!({"type": "int32"});
+
+            assert_eq!(
+                result,
+                Err(TransformJtdError::WrongTypeForTransform(
+                    expected_type,
+                    actual_type
                 ))
             );
         }
