@@ -3,9 +3,13 @@ use color_eyre::{
     Result,
     eyre::{Context, ContextCompat},
 };
+use jtd::Schema;
 use migration::{migration::Migration, migrator::Migrator};
-use std::fs::{create_dir_all, read_dir};
 use std::path::PathBuf;
+use std::{
+    collections::BTreeMap,
+    fs::{create_dir_all, read_dir},
+};
 
 #[derive(Debug, Parser)]
 struct Cli {
@@ -64,11 +68,21 @@ impl Cli {
                 let migrator = self.get_migrator()?;
 
                 let path = migrator
-                    .migration_path(Some(name), "user.v1")
-                    // .migration_lenses(None, name)
+                    .migration_path(None, name)
                     .wrap_err_with(|| format!("could not find migration path to {}", name))?;
 
-                println!("{path:#?}");
+                let mut dest = Schema::Empty {
+                    definitions: BTreeMap::new(),
+                    metadata: BTreeMap::new(),
+                };
+
+                for lens in path {
+                    lens.transform_jtd(&mut dest)
+                        .wrap_err("could not transform schema")?;
+                }
+
+                let json = serde_json::to_string_pretty(&dest.into_serde_schema())?;
+                println!("{}", json);
             }
         }
 
