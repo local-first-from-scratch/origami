@@ -309,8 +309,8 @@ impl Lens {
                         Ok(())
                     } else {
                         Err(TransformJtdError::WrongTypeForTransform(
-                            expected_type,
-                            prop.clone(),
+                            Box::new(expected_type),
+                            Box::new(prop.clone()),
                         ))
                     }
                 } else {
@@ -324,7 +324,7 @@ impl Lens {
             (_, schema) => Err(TransformJtdError::ExpectedXGotY(
                 self.name(),
                 "properties",
-                schema_name(&schema),
+                schema_name(schema),
             )),
         }
     }
@@ -376,7 +376,7 @@ pub enum TransformJtdError {
     KeyConflict(String),
 
     #[error("Got the wrong source type for `transform`. Expected `{0:?}`, got `{1:?}`.")]
-    WrongTypeForTransform(Schema, Schema),
+    WrongTypeForTransform(Box<Schema>, Box<Schema>),
 }
 
 #[cfg(test)]
@@ -1097,8 +1097,8 @@ mod test {
             assert_eq!(
                 result,
                 Err(TransformJtdError::WrongTypeForTransform(
-                    expected_type,
-                    actual_type
+                    Box::new(expected_type),
+                    Box::new(actual_type)
                 ))
             );
         }
