@@ -114,7 +114,8 @@ impl Lens {
     }
 
     pub fn transform_jtd(&self, schema: &mut jtd::Schema) -> Result<(), TransformJtdError> {
-        // First, we convert the schema to an object if it's empty.
+        // First, check to see if the schema is empty. In that case, we
+        // assume it's an object (`properties`) and restart.
         if let Schema::Empty {
             definitions,
             metadata,
@@ -131,148 +132,168 @@ impl Lens {
             };
         }
 
-        // Next we modify!
-        if let Schema::Properties { properties, .. } = schema {
-            match self {
-                Lens::Add(add_remove) => {
-                    if properties.contains_key(&add_remove.name) {
-                        return Err(TransformJtdError::KeyConflict(add_remove.name.clone()));
-                    }
+        // Next, we transform!
+        match (self, schema) {
+            (Lens::Add(add_remove), Schema::Properties { properties, .. }) => {
+                if properties.contains_key(&add_remove.name) {
+                    return Err(TransformJtdError::KeyConflict(add_remove.name.clone()));
+                }
 
-                    properties.insert(
-                        add_remove.name.clone(),
-                        Schema::from_serde_schema(add_remove.type_.clone())?,
-                    );
-                }
-                Lens::Remove(add_remove) => {
-                    properties.remove(&add_remove.name).ok_or_else(|| {
-                        TransformJtdError::MissingName(self.name(), add_remove.name.clone())
-                    })?;
-                }
-                Lens::Rename(Rename { from, to }) => {
-                    let existing = properties
-                        .remove(from)
-                        .ok_or_else(|| TransformJtdError::MissingName(self.name(), from.clone()))?;
+                properties.insert(
+                    add_remove.name.clone(),
+                    Schema::from_serde_schema(add_remove.type_.clone())?,
+                );
 
-                    properties.insert(to.clone(), existing);
-                }
-                Lens::Extract(extract_embed) => {
-                    let (host, mut existing) = properties
-                        .remove_entry(&extract_embed.host)
-                        .ok_or_else(|| {
-                            TransformJtdError::MissingName(self.name(), extract_embed.host.clone())
-                        })?;
-
-                    if let Schema::Properties {
-                        properties: host_props,
-                        ..
-                    } = &mut existing
-                    {
-                        if let Some(definition) = host_props.remove(&extract_embed.name) {
-                            properties.insert(host, definition);
-                        } else {
-                            properties.insert(host.clone(), existing); // replace so we don't mangle input object
-                            return Err(TransformJtdError::Within(
-                                extract_embed.host.clone(),
-                                Box::new(TransformJtdError::MissingName(
-                                    self.name(),
-                                    extract_embed.name.clone(),
-                                )),
-                            ));
-                        }
-                    } else {
-                        let err = Err(TransformJtdError::ExpectedXGotY(
-                            self.name(),
-                            "properties",
-                            schema_name(&existing),
-                        ));
-
-                        properties.insert(host, existing); // replace so we don't mangle input object
-                        return err;
-                    }
-                }
-                Lens::Embed(extract_embed) => {
-                    if let Some((host, definition)) = properties.remove_entry(&extract_embed.host) {
-                        properties.insert(
-                            host,
-                            Schema::Properties {
-                                definitions: BTreeMap::new(),
-                                metadata: BTreeMap::new(),
-                                nullable: false,
-                                properties: BTreeMap::from([(
-                                    extract_embed.name.clone(),
-                                    definition,
-                                )]),
-                                additional_properties: false,
-                                optional_properties: BTreeMap::new(),
-                                properties_is_present: true,
-                            },
-                        );
-                    } else {
-                        return Err(TransformJtdError::MissingName(
-                            self.name(),
-                            extract_embed.host.clone(),
-                        ));
-                    }
-                }
-                Lens::Head(WrapHead { name }) => {
-                    let (host, existing) = properties
-                        .remove_entry(name)
-                        .ok_or_else(|| TransformJtdError::MissingName(self.name(), name.clone()))?;
-
-                    if let Schema::Elements { elements, .. } = existing {
-                        properties.insert(host, *elements);
-                    } else {
-                        let err = TransformJtdError::ExpectedXGotY(
-                            self.name(),
-                            "elements",
-                            schema_name(&existing),
-                        );
-
-                        properties.insert(host, existing); // replace so we don't mangle input object
-                        return Err(err);
-                    }
-                }
-                Lens::Wrap(WrapHead { name }) => {
-                    if let Some((host, definition)) = properties.remove_entry(name) {
-                        properties.insert(
-                            host,
-                            Schema::Elements {
-                                definitions: BTreeMap::new(),
-                                metadata: BTreeMap::new(),
-                                nullable: false,
-                                elements: Box::new(definition),
-                            },
-                        );
-                    } else {
-                        return Err(TransformJtdError::MissingName(self.name(), name.clone()));
-                    }
-                }
-                Lens::In(in_) => {
-                    if let Some(prop) = properties.get_mut(&in_.name) {
-                        for op in &in_.ops {
-                            op.transform_jtd(prop).map_err(|err| {
-                                TransformJtdError::Within(in_.name.clone(), Box::new(err))
-                            })?;
-                        }
-                    } else {
-                        return Err(TransformJtdError::MissingName(
-                            self.name(),
-                            in_.name.clone(),
-                        ));
-                    }
-                }
-                Lens::Map(_map) => todo!(),
-                Lens::Convert(_convert) => todo!(),
+                Ok(())
             }
 
-            Ok(())
-        } else {
-            Err(TransformJtdError::ExpectedXGotY(
+            (Lens::Remove(add_remove), Schema::Properties { properties, .. }) => {
+                properties.remove(&add_remove.name).ok_or_else(|| {
+                    TransformJtdError::MissingName(self.name(), add_remove.name.clone())
+                })?;
+
+                Ok(())
+            }
+
+            (Lens::Rename(Rename { from, to }), Schema::Properties { properties, .. }) => {
+                let existing = properties
+                    .remove(from)
+                    .ok_or_else(|| TransformJtdError::MissingName(self.name(), from.clone()))?;
+
+                properties.insert(to.clone(), existing);
+
+                Ok(())
+            }
+
+            (Lens::Extract(extract_embed), Schema::Properties { properties, .. }) => {
+                let (host, mut existing) = properties
+                    .remove_entry(&extract_embed.host)
+                    .ok_or_else(|| {
+                        TransformJtdError::MissingName(self.name(), extract_embed.host.clone())
+                    })?;
+
+                if let Schema::Properties {
+                    properties: host_props,
+                    ..
+                } = &mut existing
+                {
+                    if let Some(definition) = host_props.remove(&extract_embed.name) {
+                        properties.insert(host, definition);
+
+                        Ok(())
+                    } else {
+                        properties.insert(host.clone(), existing); // replace so we don't mangle input object
+
+                        Err(TransformJtdError::Within(
+                            extract_embed.host.clone(),
+                            Box::new(TransformJtdError::MissingName(
+                                self.name(),
+                                extract_embed.name.clone(),
+                            )),
+                        ))
+                    }
+                } else {
+                    let err = TransformJtdError::ExpectedXGotY(
+                        self.name(),
+                        "properties",
+                        schema_name(&existing),
+                    );
+
+                    properties.insert(host, existing); // replace so we don't mangle input object
+
+                    Err(err)
+                }
+            }
+
+            (Lens::Embed(extract_embed), Schema::Properties { properties, .. }) => {
+                if let Some((host, definition)) = properties.remove_entry(&extract_embed.host) {
+                    properties.insert(
+                        host,
+                        Schema::Properties {
+                            definitions: BTreeMap::new(),
+                            metadata: BTreeMap::new(),
+                            nullable: false,
+                            properties: BTreeMap::from([(extract_embed.name.clone(), definition)]),
+                            additional_properties: false,
+                            optional_properties: BTreeMap::new(),
+                            properties_is_present: true,
+                        },
+                    );
+
+                    Ok(())
+                } else {
+                    Err(TransformJtdError::MissingName(
+                        self.name(),
+                        extract_embed.host.clone(),
+                    ))
+                }
+            }
+
+            (Lens::Head(WrapHead { name }), Schema::Properties { properties, .. }) => {
+                let (host, existing) = properties
+                    .remove_entry(name)
+                    .ok_or_else(|| TransformJtdError::MissingName(self.name(), name.clone()))?;
+
+                if let Schema::Elements { elements, .. } = existing {
+                    properties.insert(host, *elements);
+
+                    Ok(())
+                } else {
+                    let err = TransformJtdError::ExpectedXGotY(
+                        self.name(),
+                        "elements",
+                        schema_name(&existing),
+                    );
+
+                    properties.insert(host, existing); // replace so we don't mangle input object
+
+                    Err(err)
+                }
+            }
+
+            (Lens::Wrap(WrapHead { name }), Schema::Properties { properties, .. }) => {
+                if let Some((host, definition)) = properties.remove_entry(name) {
+                    properties.insert(
+                        host,
+                        Schema::Elements {
+                            definitions: BTreeMap::new(),
+                            metadata: BTreeMap::new(),
+                            nullable: false,
+                            elements: Box::new(definition),
+                        },
+                    );
+
+                    Ok(())
+                } else {
+                    Err(TransformJtdError::MissingName(self.name(), name.clone()))
+                }
+            }
+
+            (Lens::In(in_), Schema::Properties { properties, .. }) => {
+                if let Some(prop) = properties.get_mut(&in_.name) {
+                    for op in &in_.ops {
+                        op.transform_jtd(prop).map_err(|err| {
+                            TransformJtdError::Within(in_.name.clone(), Box::new(err))
+                        })?;
+                    }
+
+                    Ok(())
+                } else {
+                    Err(TransformJtdError::MissingName(
+                        self.name(),
+                        in_.name.clone(),
+                    ))
+                }
+            }
+
+            (Lens::Map(_), _) => todo!(),
+            (Lens::Convert(_convert), _) => todo!(),
+
+            (_, schema) => Err(TransformJtdError::ExpectedXGotY(
                 self.name(),
                 "properties",
-                schema_name(schema),
-            ))
+                schema_name(&schema),
+            )),
         }
     }
 
