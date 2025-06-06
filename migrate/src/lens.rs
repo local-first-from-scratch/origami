@@ -127,7 +127,7 @@ impl Lens {
                 nullable: false,
                 properties: BTreeMap::new(),
                 optional_properties: BTreeMap::new(),
-                properties_is_present: false,
+                properties_is_present: true,
                 additional_properties: false,
             };
         }
