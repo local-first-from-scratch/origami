@@ -286,7 +286,19 @@ impl Lens {
                 }
             }
 
-            (Lens::Map(_), _) => todo!(),
+            (Lens::Map(map), Schema::Elements { elements, .. }) => {
+                for op in &map.ops {
+                    op.transform_jtd(elements)?
+                }
+
+                Ok(())
+            }
+            (Lens::Map(_), schema) => Err(TransformJtdError::ExpectedXGotY(
+                "map",
+                "elements",
+                schema_name(schema),
+            )),
+
             (Lens::Convert(_convert), _) => todo!(),
 
             (_, schema) => Err(TransformJtdError::ExpectedXGotY(
@@ -924,6 +936,78 @@ mod test {
                         "rename",
                         "nonexistent_field".to_string()
                     ))
+                ))
+            );
+        }
+
+        #[test]
+        fn map_ok() {
+            let lens = lens!({
+                "map": {
+                    "ops": [{
+                        "rename": {
+                            "from": "old_field",
+                            "to": "new_field"
+                        }
+                    }]
+                }
+            });
+
+            let mut schema = schema!({
+                "elements": {
+                    "properties": {
+                        "old_field": {
+                            "type": "string"
+                        }
+                    }
+                }
+            });
+
+            lens.transform_jtd(&mut schema).unwrap();
+
+            assert_eq!(
+                schema,
+                schema!({
+                    "elements": {
+                        "properties": {
+                            "new_field": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                })
+            );
+        }
+
+        #[test]
+        fn map_wrong_type() {
+            let lens = lens!({
+                "map": {
+                    "ops": [{
+                        "rename": {
+                            "from": "old_field",
+                            "to": "new_field"
+                        }
+                    }]
+                }
+            });
+
+            let mut schema = schema!({
+                "properties": {
+                    "some_field": {
+                        "type": "string"
+                    }
+                }
+            });
+
+            let result = lens.transform_jtd(&mut schema);
+
+            assert_eq!(
+                result,
+                Err(TransformJtdError::ExpectedXGotY(
+                    "map",
+                    "elements",
+                    "properties"
                 ))
             );
         }
