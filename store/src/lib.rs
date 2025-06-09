@@ -41,7 +41,7 @@ pub fn dry_run() -> Result<JsValue, serde_wasm_bindgen::Error> {
             node,
         );
 
-        let list_id = doc.make_list(node);
+        let list_id = doc.make_list("test".into(), node);
         doc.assign(
             map_id,
             AssignKey::MapKey("list".into()),

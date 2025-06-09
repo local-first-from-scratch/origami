@@ -45,7 +45,7 @@ impl Hub {
         let mut doc = Document::default();
         match root_kind {
             RootKind::Map => doc.make_map(schema, *self.actor),
-            RootKind::List => doc.make_list(*self.actor),
+            RootKind::List => doc.make_list(schema, *self.actor),
         };
 
         let doc = Arc::new(RwLock::new(doc));

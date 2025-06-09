@@ -39,7 +39,7 @@ impl Document {
 
     pub fn root(&self) -> Option<&Timestamp> {
         for (id, op) in &self.operations {
-            if matches!(op, Operation::MakeMap { .. } | Operation::MakeList) {
+            if matches!(op, Operation::MakeMap { .. } | Operation::MakeList { .. }) {
                 return Some(id);
             }
         }
@@ -58,13 +58,13 @@ impl Document {
                 self.maps.insert(id, Assign::new(schema.clone()));
             }
 
-            Operation::MakeList => {
+            Operation::MakeList { schema } => {
                 debug_assert!(
                     !self.maps.contains_key(&id),
                     "document.lists already contains {id}"
                 );
 
-                self.list_items.insert(id, Assign::new(todo!()));
+                self.list_items.insert(id, Assign::new(schema.clone()));
             }
 
             Operation::MakeVal { val, schema } => {
@@ -124,9 +124,9 @@ impl Document {
         id
     }
 
-    pub fn make_list(&mut self, node: Uuid) -> Timestamp {
+    pub fn make_list(&mut self, schema: String, node: Uuid) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
-        let op = Operation::MakeList;
+        let op = Operation::MakeList { schema };
 
         self.apply(id, &op);
         self.operations.push((id, op));
@@ -362,7 +362,7 @@ mod test {
         let mut doc = Document::default();
         let node_id = Uuid::new_v4();
 
-        let list_id = doc.make_list(node_id);
+        let list_id = doc.make_list("test".into(), node_id);
 
         // The timestamp should now exist in the document
         assert!(doc.list_items.contains_key(&list_id));
@@ -472,7 +472,7 @@ mod test {
         #[test]
         fn list_assign() {
             let mut doc = Document::default();
-            let root_id = doc.make_list(Uuid::nil());
+            let root_id = doc.make_list("test".into(), Uuid::nil());
 
             let val_a = doc.make_val("hello".into(), "test".into(), Uuid::nil());
             let insert_a = doc.insert_after(root_id, Uuid::nil());
@@ -540,7 +540,7 @@ mod test {
             let mut doc = Document::default();
             let root_id = doc.make_map("test".into(), Uuid::nil());
 
-            let greetings_id = doc.make_list(Uuid::nil());
+            let greetings_id = doc.make_list("test".into(), Uuid::nil());
             doc.assign(
                 root_id,
                 AssignKey::MapKey("greetings".into()),

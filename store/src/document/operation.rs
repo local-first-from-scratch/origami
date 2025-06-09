@@ -8,7 +8,9 @@ pub enum Operation {
     MakeMap {
         schema: String,
     },
-    MakeList,
+    MakeList {
+        schema: String,
+    },
     MakeVal {
         val: Value,
         schema: String,
