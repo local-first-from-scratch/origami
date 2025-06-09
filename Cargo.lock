@@ -671,6 +671,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26995317201fa17f3656c36716aed4a7c81743a9634ac4c99c0eeda495db0cec"
 
 [[package]]
+name = "patch"
+version = "0.1.0"
+dependencies = [
+ "pretty_assertions",
+ "serde_json",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "petgraph"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
