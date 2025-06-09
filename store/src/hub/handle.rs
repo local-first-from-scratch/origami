@@ -46,13 +46,13 @@ impl Handle {
     }
 
     /// Assign a value in a map at the current location.
-    pub fn set(&self, key: JsString, value: JsValue) -> Result<(), Error> {
+    pub fn set(&self, key: JsString, value: JsValue, schema: JsString) -> Result<(), Error> {
         // Make the write
         {
             let mut doc = self.doc.write()?;
             let root = *doc.root().ok_or(Error::MissingRoot)?;
 
-            let val_id = doc.make_val(value.try_into()?, *self.actor);
+            let val_id = doc.make_val(value.try_into()?, schema.into(), *self.actor);
 
             let key = crate::document::AssignKey::MapKey(key.into());
 

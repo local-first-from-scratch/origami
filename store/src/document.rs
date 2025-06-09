@@ -23,7 +23,7 @@ pub struct Document {
     list_items: BTreeMap<Timestamp, Assign<Timestamp>>,
     list_ordering: Order,
 
-    values: BTreeMap<Timestamp, Value>,
+    values: BTreeMap<Timestamp, (Value, String)>,
 
     highest_counter: u64,
 }
@@ -67,13 +67,14 @@ impl Document {
                 self.list_items.insert(id, Assign::new());
             }
 
-            Operation::MakeVal { val } => {
+            Operation::MakeVal { val, schema } => {
                 debug_assert!(
                     !self.values.contains_key(&id),
                     "document already contains val {id}"
                 );
 
-                self.values.insert(id, val.clone());
+                // TODO: could we use references here?
+                self.values.insert(id, (val.clone(), schema.clone()));
             }
 
             Operation::Assign {
@@ -134,9 +135,12 @@ impl Document {
         id
     }
 
-    pub fn make_val(&mut self, val: Value, node: Uuid) -> Timestamp {
+    pub fn make_val(&mut self, val: Value, schema: String, node: Uuid) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
-        let op = Operation::MakeVal { val };
+        let op = Operation::MakeVal {
+            val,
+            schema: schema.clone(),
+        };
 
         self.apply(id, &op);
         self.operations.push((id, op));
@@ -208,7 +212,7 @@ impl Document {
             self.push_map_patches(id, here, ops)
         } else if self.list_items.contains_key(id) {
             self.push_list_patches(id, here, ops)
-        } else if let Some(val) = self.values.get(id) {
+        } else if let Some((val, _schema)) = self.values.get(id) {
             ops.push(PatchOperation::Add(AddOperation {
                 path: here,
                 value: val.into(),
@@ -281,7 +285,7 @@ impl Document {
             self.get_map(id)
         } else if self.list_items.contains_key(id) {
             self.get_list(id)
-        } else if let Some(val) = self.values.get(id) {
+        } else if let Some((val, _schema)) = self.values.get(id) {
             val.into()
         } else {
             serde_json::Value::Null
@@ -371,10 +375,10 @@ mod test {
         let node_id = Uuid::new_v4();
         let value = Value::from(0);
 
-        let val_id = doc.make_val(value.clone(), node_id);
+        let val_id = doc.make_val(value.clone(), "test".into(), node_id);
 
         // The timestamp should now exist in the document
-        assert_eq!(doc.values.get(&val_id), Some(&value));
+        assert_eq!(doc.values.get(&val_id), Some(&(value, "test".into())));
     }
 
     #[test]
@@ -391,7 +395,7 @@ mod test {
         let non_existent_id = Timestamp::new(999, node_id);
 
         // Create a value to assign
-        let val_id = doc.make_val(0.into(), node_id);
+        let val_id = doc.make_val(0.into(), "test".into(), node_id);
 
         // Try to assign the value to a non-existent object
         doc.assign(
@@ -412,7 +416,7 @@ mod test {
         let node = Uuid::nil();
 
         let map_id = doc.make_map(node);
-        let val = doc.make_val(1.into(), node);
+        let val = doc.make_val(1.into(), "test".into(), node);
 
         let key = "test".to_string();
         let assign_key = AssignKey::MapKey(key.clone());
@@ -449,7 +453,7 @@ mod test {
         fn object_assign() {
             let mut doc = Document::default();
             let root_id = doc.make_map(Uuid::nil());
-            let val_id = doc.make_val("world".into(), Uuid::nil());
+            let val_id = doc.make_val("world".into(), "test".into(), Uuid::nil());
             doc.assign(
                 root_id,
                 AssignKey::MapKey("hello".to_string()),
@@ -471,7 +475,7 @@ mod test {
             let mut doc = Document::default();
             let root_id = doc.make_list(Uuid::nil());
 
-            let val_a = doc.make_val("hello".into(), Uuid::nil());
+            let val_a = doc.make_val("hello".into(), "test".into(), Uuid::nil());
             let insert_a = doc.insert_after(root_id, Uuid::nil());
             doc.assign(
                 root_id,
@@ -481,7 +485,7 @@ mod test {
                 Uuid::nil(),
             );
 
-            let val_b = doc.make_val("howdy".into(), Uuid::nil());
+            let val_b = doc.make_val("howdy".into(), "test".into(), Uuid::nil());
             let insert_b = doc.insert_after(insert_a, Uuid::nil());
             doc.assign(
                 root_id,
@@ -514,7 +518,7 @@ mod test {
                 Uuid::nil(),
             );
 
-            let world_id = doc.make_val("world".into(), Uuid::nil());
+            let world_id = doc.make_val("world".into(), "test".into(), Uuid::nil());
             doc.assign(
                 greetings_id,
                 AssignKey::MapKey("hello".to_string()),
@@ -547,7 +551,7 @@ mod test {
             );
 
             let insert_id = doc.insert_after(greetings_id, Uuid::nil());
-            let world_id = doc.make_val("world".into(), Uuid::nil());
+            let world_id = doc.make_val("world".into(), "test".into(), Uuid::nil());
             doc.assign(
                 greetings_id,
                 AssignKey::InsertAfter(insert_id),

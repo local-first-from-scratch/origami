@@ -9,6 +9,7 @@ pub enum Operation {
     MakeList,
     MakeVal {
         val: Value,
+        schema: String,
     },
     InsertAfter {
         prev: Timestamp,

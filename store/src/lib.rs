@@ -32,7 +32,7 @@ pub fn dry_run() -> Result<JsValue, serde_wasm_bindgen::Error> {
         log(&format!("new map: {map_id:#?}"));
         log(&format!("doc is now: {doc:#?}"));
 
-        let world_id = doc.make_val("World".into(), node);
+        let world_id = doc.make_val("World".into(), "test".into(), node);
         doc.assign(
             map_id,
             AssignKey::MapKey("hello".into()),
