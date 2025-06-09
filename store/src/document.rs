@@ -39,7 +39,7 @@ impl Document {
 
     pub fn root(&self) -> Option<&Timestamp> {
         for (id, op) in &self.operations {
-            if matches!(op, Operation::MakeMap | Operation::MakeList) {
+            if matches!(op, Operation::MakeMap { .. } | Operation::MakeList) {
                 return Some(id);
             }
         }
@@ -49,13 +49,13 @@ impl Document {
 
     fn apply(&mut self, id: Timestamp, operation: &Operation) {
         match operation {
-            Operation::MakeMap => {
+            Operation::MakeMap { schema } => {
                 debug_assert!(
                     !self.maps.contains_key(&id),
                     "document.maps already contains {id}"
                 );
 
-                self.maps.insert(id, Assign::new());
+                self.maps.insert(id, Assign::new(schema.clone()));
             }
 
             Operation::MakeList => {
@@ -64,7 +64,7 @@ impl Document {
                     "document.lists already contains {id}"
                 );
 
-                self.list_items.insert(id, Assign::new());
+                self.list_items.insert(id, Assign::new(todo!()));
             }
 
             Operation::MakeVal { val, schema } => {
@@ -85,16 +85,15 @@ impl Document {
             } => {
                 match key {
                     AssignKey::MapKey(key) => {
-                        self.maps
-                            .entry(*obj)
-                            .or_default()
-                            .assign(id, key.clone(), *val, prev)
+                        if let Some(map) = self.maps.get_mut(obj) {
+                            map.assign(id, key.clone(), *val, prev)
+                        }
                     }
-                    AssignKey::InsertAfter(timestamp) => self
-                        .list_items
-                        .entry(*obj)
-                        .or_insert_with(Assign::new)
-                        .assign(id, *timestamp, *val, prev),
+                    AssignKey::InsertAfter(timestamp) => {
+                        if let Some(list) = self.list_items.get_mut(obj) {
+                            list.assign(id, *timestamp, *val, prev)
+                        }
+                    }
                 };
             }
 
@@ -115,9 +114,9 @@ impl Document {
         };
     }
 
-    pub fn make_map(&mut self, node: Uuid) -> Timestamp {
+    pub fn make_map(&mut self, schema: String, node: Uuid) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
-        let op = Operation::MakeMap;
+        let op = Operation::MakeMap { schema };
 
         self.apply(id, &op);
         self.operations.push((id, op));
@@ -352,7 +351,7 @@ mod test {
         let mut doc = Document::default();
         let node_id = Uuid::new_v4();
 
-        let map_id = doc.make_map(node_id);
+        let map_id = doc.make_map("test".into(), node_id);
 
         // The timestamp should now exist in the document
         assert!(doc.maps.contains_key(&map_id));
@@ -415,7 +414,7 @@ mod test {
         let mut doc = Document::default();
         let node = Uuid::nil();
 
-        let map_id = doc.make_map(node);
+        let map_id = doc.make_map("test".into(), node);
         let val = doc.make_val(1.into(), "test".into(), node);
 
         let key = "test".to_string();
@@ -444,7 +443,7 @@ mod test {
         #[test]
         fn object_root() {
             let mut doc = Document::default();
-            doc.make_map(Uuid::nil());
+            doc.make_map("test".into(), Uuid::nil());
 
             assert_eq!(doc.as_patch(), patch!([]));
         }
@@ -452,7 +451,7 @@ mod test {
         #[test]
         fn object_assign() {
             let mut doc = Document::default();
-            let root_id = doc.make_map(Uuid::nil());
+            let root_id = doc.make_map("test".into(), Uuid::nil());
             let val_id = doc.make_val("world".into(), "test".into(), Uuid::nil());
             doc.assign(
                 root_id,
@@ -507,9 +506,9 @@ mod test {
         #[test]
         fn deep_assign_map() {
             let mut doc = Document::default();
-            let root_id = doc.make_map(Uuid::nil());
+            let root_id = doc.make_map("test".into(), Uuid::nil());
 
-            let greetings_id = doc.make_map(Uuid::nil());
+            let greetings_id = doc.make_map("test".into(), Uuid::nil());
             doc.assign(
                 root_id,
                 AssignKey::MapKey("greetings".into()),
@@ -539,7 +538,7 @@ mod test {
         #[test]
         fn deep_assign_list() {
             let mut doc = Document::default();
-            let root_id = doc.make_map(Uuid::nil());
+            let root_id = doc.make_map("test".into(), Uuid::nil());
 
             let greetings_id = doc.make_list(Uuid::nil());
             doc.assign(

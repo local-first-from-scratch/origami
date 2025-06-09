@@ -3,14 +3,18 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Default)]
 pub struct Assign<K: Ord> {
+    /// The schema this assign was created with.
+    pub schema: String,
+
     // Within the values here, keys identify assign operations and values
     // identify the values that were set in the assign operation.
     values: BTreeMap<K, BTreeMap<Timestamp, Timestamp>>,
 }
 
 impl<K: Ord> Assign<K> {
-    pub fn new() -> Self {
+    pub fn new(schema: String) -> Self {
         Self {
+            schema,
             values: BTreeMap::new(),
         }
     }
@@ -52,7 +56,7 @@ mod test {
 
     #[test]
     fn assigning_to_empty_struct_retains_value() {
-        let mut assign = Assign::new();
+        let mut assign = Assign::new("test".into());
 
         let key = "a";
         let operation_id = Timestamp::new(0, Uuid::nil());
@@ -68,7 +72,7 @@ mod test {
 
     #[test]
     fn parallel_assignments_keep_both_values() {
-        let mut assign = Assign::new();
+        let mut assign = Assign::new("test".into());
 
         let key = "a";
 
@@ -93,7 +97,7 @@ mod test {
 
     #[test]
     fn prev_removes_existing_assignment() {
-        let mut assign = Assign::new();
+        let mut assign = Assign::new("test".into());
 
         let key = "a";
 
@@ -120,7 +124,7 @@ mod test {
 
     #[test]
     fn remove_removes_only_values_indicated_by_prev() {
-        let mut assign = Assign::new();
+        let mut assign = Assign::new("test".into());
 
         let key = "a";
 
@@ -146,7 +150,7 @@ mod test {
 
     #[test]
     fn remove_removes_the_entire_key_if_all_values_are_removed() {
-        let mut assign = Assign::new();
+        let mut assign = Assign::new("test".into());
 
         let key = "a";
 

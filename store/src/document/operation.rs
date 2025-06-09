@@ -5,7 +5,9 @@ use std::collections::BTreeSet;
 #[derive(Debug, PartialOrd, PartialEq, Clone)]
 #[repr(C)]
 pub enum Operation {
-    MakeMap,
+    MakeMap {
+        schema: String,
+    },
     MakeList,
     MakeVal {
         val: Value,

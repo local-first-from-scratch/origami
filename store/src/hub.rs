@@ -39,12 +39,12 @@ impl Hub {
         self.actor.to_string().into()
     }
 
-    pub fn create(&mut self, root_kind: RootKind) -> Handle {
+    pub fn create(&mut self, root_kind: RootKind, schema: String) -> Handle {
         let doc_id = Uuid::new_v4();
 
         let mut doc = Document::default();
         match root_kind {
-            RootKind::Map => doc.make_map(*self.actor),
+            RootKind::Map => doc.make_map(schema, *self.actor),
             RootKind::List => doc.make_list(*self.actor),
         };
 
