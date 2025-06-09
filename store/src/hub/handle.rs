@@ -40,9 +40,7 @@ impl Handle {
     /// Get the current value. In cases where there is more than one current
     /// value, this will give you an arbitrary (but consistent) result.
     pub fn current(&self) -> Result<JsValue, JsString> {
-        let doc = self.doc.read().map_err(|e| e.to_string())?;
-
-        serde_wasm_bindgen::to_value(&doc.as_value()).map_err(|e| e.to_string().into())
+        Err("Unimplemented".into())
     }
 
     /// Assign a value in a map at the current location.
