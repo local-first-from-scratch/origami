@@ -1,12 +1,13 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum KeyOrIndex {
     Key(String),
+    Index(usize),
     LastIndex,
 }
 
-impl From<String> for KeyOrIndex {
-    fn from(v: String) -> Self {
-        Self::Key(v)
+impl From<&String> for KeyOrIndex {
+    fn from(v: &String) -> Self {
+        Self::Key(v.clone())
     }
 }
 
@@ -16,12 +17,28 @@ impl From<&str> for KeyOrIndex {
     }
 }
 
+impl From<usize> for KeyOrIndex {
+    fn from(v: usize) -> Self {
+        Self::Index(v)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Path(Vec<KeyOrIndex>);
 
 impl Path {
     pub fn new() -> Self {
         Self(Vec::new())
+    }
+
+    pub fn is_root(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn with_next_segment(&self, segment: KeyOrIndex) -> Self {
+        let mut path = self.clone();
+        path.0.push(segment);
+        path
     }
 
     pub fn all_but_last(&self) -> impl Iterator<Item = &KeyOrIndex> {
@@ -43,6 +60,25 @@ impl<const N: usize> From<[KeyOrIndex; N]> for Path {
 mod test {
     use super::*;
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn empty_path_is_root() {
+        let path = Path::from([]);
+        assert!(path.is_root());
+    }
+
+    #[test]
+    fn non_empty_path_is_not_root() {
+        let path = Path::from(["foo".into()]);
+        assert!(!path.is_root());
+    }
+
+    #[test]
+    fn with_next_segment_appends_segment() {
+        let path = Path::from(["foo".into()]);
+        let new_path = path.with_next_segment("bar".into());
+        assert_eq!(new_path.0, vec!["foo".into(), "bar".into()]);
+    }
 
     #[test]
     fn all_but_last_is_empty_for_empty_array() {

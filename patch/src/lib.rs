@@ -22,6 +22,10 @@ pub fn to_value(patches: &Vec<SetOp>) -> Result<Value, Error> {
                     Some(next) => cursor = next,
                     None => return Err(Error::CouldNotNavigateToPath(patch.path.clone())),
                 },
+                (KeyOrIndex::Index(index), Value::Array(arr)) => match arr.get_mut(*index) {
+                    Some(next) => cursor = next,
+                    None => return Err(Error::CouldNotNavigateToPath(patch.path.clone())),
+                },
                 (KeyOrIndex::LastIndex, Value::Array(arr)) => match arr.last_mut() {
                     Some(next) => cursor = next,
                     None => return Err(Error::CouldNotNavigateToPath(patch.path.clone())),
@@ -35,6 +39,13 @@ pub fn to_value(patches: &Vec<SetOp>) -> Result<Value, Error> {
             Some(last) => match (last, cursor) {
                 (KeyOrIndex::Key(key), Value::Object(map)) => {
                     map.insert(key.clone(), patch.value.clone());
+                }
+                (KeyOrIndex::Index(index), Value::Array(arr)) => {
+                    if *index < arr.len() {
+                        arr[*index] = patch.value.clone();
+                    } else {
+                        return Err(Error::ListIndexOutOfBounds);
+                    }
                 }
                 (KeyOrIndex::LastIndex, Value::Array(arr)) => {
                     arr.push(patch.value.clone());
@@ -55,6 +66,9 @@ pub fn to_value(patches: &Vec<SetOp>) -> Result<Value, Error> {
 pub enum Error {
     #[error("Could not navigate to path {0:?}")]
     CouldNotNavigateToPath(Path),
+
+    #[error("List index was out of bounds")]
+    ListIndexOutOfBounds,
 
     #[error("Got the wrong type when navigating")]
     WrongType,
@@ -103,6 +117,83 @@ mod test {
         ];
 
         assert_eq!(to_value(&patches).unwrap(), json!({"list": [1]}));
+    }
+
+    #[test]
+    fn navigate_through_array_index() {
+        let patches = vec![
+            SetOp {
+                path: Path::from(["list".into()]),
+                value: json!([{"key": "value"}]),
+                schema: "test".to_string(),
+            },
+            SetOp {
+                path: Path::from(["list".into(), 0.into(), "key".into()]),
+                value: json!("updated"),
+                schema: "test".to_string(),
+            },
+        ];
+
+        assert_eq!(
+            to_value(&patches).unwrap(),
+            json!({"list": [{"key": "updated"}]})
+        );
+    }
+
+    #[test]
+    fn set_at_specific_index() {
+        let patches = vec![
+            SetOp {
+                path: Path::from(["list".into()]),
+                value: json!([1, 2, 3]),
+                schema: "test".to_string(),
+            },
+            SetOp {
+                path: Path::from(["list".into(), 1.into()]),
+                value: json!(99),
+                schema: "test".to_string(),
+            },
+        ];
+
+        assert_eq!(to_value(&patches).unwrap(), json!({"list": [1, 99, 3]}));
+    }
+
+    #[test]
+    fn cannot_navigate_to_out_of_bounds_index() {
+        let path = Path::from(["list".into(), 5.into(), "irrelevant".into()]);
+        let patches = vec![
+            SetOp {
+                path: Path::from(["list".into()]),
+                value: json!([1, 2]),
+                schema: "test".to_string(),
+            },
+            SetOp {
+                path: path.clone(),
+                value: json!(99),
+                schema: "test".to_string(),
+            },
+        ];
+
+        assert_eq!(to_value(&patches), Err(Error::CouldNotNavigateToPath(path)));
+    }
+
+    #[test]
+    fn cannot_set_at_out_of_bounds_index() {
+        let path = Path::from(["list".into(), 10.into()]);
+        let patches = vec![
+            SetOp {
+                path: Path::from(["list".into()]),
+                value: json!([1, 2, 3]),
+                schema: "test".to_string(),
+            },
+            SetOp {
+                path: path.clone(),
+                value: json!(99),
+                schema: "test".to_string(),
+            },
+        ];
+
+        assert_eq!(to_value(&patches), Err(Error::ListIndexOutOfBounds));
     }
 
     #[test]
