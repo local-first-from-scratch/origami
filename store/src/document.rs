@@ -5,10 +5,10 @@ mod value;
 
 use crate::timestamp::Timestamp;
 use assign::Assign;
-use json_patch::{AddOperation, PatchOperation, jsonptr::PointerBuf};
 pub use operation::AssignKey;
 use operation::Operation;
 use order::Order;
+use patch::{Path, SetOp};
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use uuid::Uuid;
@@ -23,7 +23,7 @@ pub struct Document {
     list_items: BTreeMap<Timestamp, Assign<Timestamp>>,
     list_ordering: Order,
 
-    values: BTreeMap<Timestamp, Value>,
+    values: BTreeMap<Timestamp, (Value, String)>,
 
     highest_counter: u64,
 }
@@ -39,7 +39,7 @@ impl Document {
 
     pub fn root(&self) -> Option<&Timestamp> {
         for (id, op) in &self.operations {
-            if matches!(op, Operation::MakeMap | Operation::MakeList) {
+            if matches!(op, Operation::MakeMap { .. } | Operation::MakeList { .. }) {
                 return Some(id);
             }
         }
@@ -49,31 +49,32 @@ impl Document {
 
     fn apply(&mut self, id: Timestamp, operation: &Operation) {
         match operation {
-            Operation::MakeMap => {
+            Operation::MakeMap { schema } => {
                 debug_assert!(
                     !self.maps.contains_key(&id),
                     "document.maps already contains {id}"
                 );
 
-                self.maps.insert(id, Assign::new());
+                self.maps.insert(id, Assign::new(schema.clone()));
             }
 
-            Operation::MakeList => {
+            Operation::MakeList { schema } => {
                 debug_assert!(
                     !self.maps.contains_key(&id),
                     "document.lists already contains {id}"
                 );
 
-                self.list_items.insert(id, Assign::new());
+                self.list_items.insert(id, Assign::new(schema.clone()));
             }
 
-            Operation::MakeVal { val } => {
+            Operation::MakeVal { val, schema } => {
                 debug_assert!(
                     !self.values.contains_key(&id),
                     "document already contains val {id}"
                 );
 
-                self.values.insert(id, val.clone());
+                // TODO: could we use references here?
+                self.values.insert(id, (val.clone(), schema.clone()));
             }
 
             Operation::Assign {
@@ -84,16 +85,15 @@ impl Document {
             } => {
                 match key {
                     AssignKey::MapKey(key) => {
-                        self.maps
-                            .entry(*obj)
-                            .or_default()
-                            .assign(id, key.clone(), *val, prev)
+                        if let Some(map) = self.maps.get_mut(obj) {
+                            map.assign(id, key.clone(), *val, prev)
+                        }
                     }
-                    AssignKey::InsertAfter(timestamp) => self
-                        .list_items
-                        .entry(*obj)
-                        .or_insert_with(Assign::new)
-                        .assign(id, *timestamp, *val, prev),
+                    AssignKey::InsertAfter(timestamp) => {
+                        if let Some(list) = self.list_items.get_mut(obj) {
+                            list.assign(id, *timestamp, *val, prev)
+                        }
+                    }
                 };
             }
 
@@ -114,9 +114,9 @@ impl Document {
         };
     }
 
-    pub fn make_map(&mut self, node: Uuid) -> Timestamp {
+    pub fn make_map(&mut self, schema: String, node: Uuid) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
-        let op = Operation::MakeMap;
+        let op = Operation::MakeMap { schema };
 
         self.apply(id, &op);
         self.operations.push((id, op));
@@ -124,9 +124,9 @@ impl Document {
         id
     }
 
-    pub fn make_list(&mut self, node: Uuid) -> Timestamp {
+    pub fn make_list(&mut self, schema: String, node: Uuid) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
-        let op = Operation::MakeList;
+        let op = Operation::MakeList { schema };
 
         self.apply(id, &op);
         self.operations.push((id, op));
@@ -134,9 +134,12 @@ impl Document {
         id
     }
 
-    pub fn make_val(&mut self, val: Value, node: Uuid) -> Timestamp {
+    pub fn make_val(&mut self, val: Value, schema: String, node: Uuid) -> Timestamp {
         let id = Timestamp::new(self.next_timestamp_counter(), node);
-        let op = Operation::MakeVal { val };
+        let op = Operation::MakeVal {
+            val,
+            schema: schema.clone(),
+        };
 
         self.apply(id, &op);
         self.operations.push((id, op));
@@ -192,9 +195,9 @@ impl Document {
         id
     }
 
-    pub fn as_patch(&self) -> Vec<PatchOperation> {
+    pub fn as_patch(&self) -> Vec<SetOp> {
         let mut ops = Vec::new();
-        let here = PointerBuf::new();
+        let here = Path::new();
 
         if let Some(root) = self.root() {
             self.push_patch(root, here, &mut ops)
@@ -203,16 +206,17 @@ impl Document {
         ops
     }
 
-    fn push_patch(&self, id: &Timestamp, here: PointerBuf, ops: &mut Vec<PatchOperation>) {
+    fn push_patch(&self, id: &Timestamp, here: Path, ops: &mut Vec<SetOp>) {
         if self.maps.contains_key(id) {
             self.push_map_patches(id, here, ops)
         } else if self.list_items.contains_key(id) {
             self.push_list_patches(id, here, ops)
-        } else if let Some(val) = self.values.get(id) {
-            ops.push(PatchOperation::Add(AddOperation {
-                path: here,
+        } else if let Some((val, schema)) = self.values.get(id) {
+            ops.push(SetOp {
+                path: here.clone(),
                 value: val.into(),
-            }))
+                schema: schema.clone(),
+            })
         } else {
             // TODO: a better error if we don't have all the values we expected.
             // This shouldn't happen (it can currently happen if you remove an
@@ -224,18 +228,19 @@ impl Document {
 
     /// Push JSON patches to the `ops`, assuming that the ID has already been
     /// validated as a map. If that assumption does not hold, this is a no-op.
-    fn push_map_patches(&self, id: &Timestamp, here: PointerBuf, ops: &mut Vec<PatchOperation>) {
+    fn push_map_patches(&self, id: &Timestamp, here: Path, ops: &mut Vec<SetOp>) {
         if let Some(assign) = self.maps.get(id) {
             if !here.is_root() {
-                ops.push(PatchOperation::Add(AddOperation {
+                ops.push(SetOp {
                     path: here.clone(),
                     value: json!({}),
-                }));
+                    schema: assign.schema.clone(),
+                });
             }
 
             for (k, v) in assign.iter_map() {
                 if v.len() == 1 {
-                    self.push_patch(v[0], here.with_trailing_token(k), ops);
+                    self.push_patch(v[0], here.with_next_segment(k.into()), ops);
                 } else {
                     todo!("multiple-valued key in map")
                 }
@@ -244,13 +249,14 @@ impl Document {
     }
 
     /// Push JSON patches to the `ops`, assuming that the ID has already been validated as a list.
-    fn push_list_patches(&self, id: &Timestamp, here: PointerBuf, ops: &mut Vec<PatchOperation>) {
+    fn push_list_patches(&self, id: &Timestamp, here: Path, ops: &mut Vec<SetOp>) {
         if let Some(assign) = self.list_items.get(id) {
             if !here.is_root() {
-                ops.push(PatchOperation::Add(AddOperation {
+                ops.push(SetOp {
                     path: here.clone(),
                     value: json!([]),
-                }));
+                    schema: assign.schema.clone(),
+                });
             }
 
             for (index, item_id) in self.list_ordering.iter(id).enumerate() {
@@ -258,7 +264,7 @@ impl Document {
                     if values.len() == 1 {
                         self.push_patch(
                             values.first_key_value().unwrap().1,
-                            here.with_trailing_token(index),
+                            here.with_next_segment(index.into()),
                             ops,
                         )
                     } else {
@@ -267,59 +273,6 @@ impl Document {
                 }
             }
         }
-    }
-
-    pub fn as_value(&self) -> serde_json::Value {
-        match self.root() {
-            None => serde_json::Value::Null,
-            Some(root) => self.get(root),
-        }
-    }
-
-    fn get(&self, id: &Timestamp) -> serde_json::Value {
-        if self.maps.contains_key(id) {
-            self.get_map(id)
-        } else if self.list_items.contains_key(id) {
-            self.get_list(id)
-        } else if let Some(val) = self.values.get(id) {
-            val.into()
-        } else {
-            serde_json::Value::Null
-        }
-    }
-
-    fn get_map(&self, id: &Timestamp) -> serde_json::Value {
-        let mut map = BTreeMap::new();
-
-        if let Some(assign) = self.maps.get(id) {
-            for (k, v) in assign.iter_map() {
-                if v.len() == 1 {
-                    map.insert(k.to_string(), self.get(v[0]));
-                } else {
-                    todo!("multiple-valued key in map")
-                }
-            }
-        }
-
-        json!(map)
-    }
-
-    fn get_list(&self, id: &Timestamp) -> serde_json::Value {
-        let mut list = Vec::new();
-
-        if let Some(assign) = self.list_items.get(id) {
-            for item_id in self.list_ordering.iter(id) {
-                if let Some(values) = assign.get(item_id) {
-                    if values.len() == 1 {
-                        list.push(self.get(values.first_key_value().unwrap().1))
-                    } else {
-                        todo!("multiple-valued key in list")
-                    }
-                }
-            }
-        }
-
-        json!(list)
     }
 
     pub fn current_assigns(&self, id: &Timestamp, assign_key: &AssignKey) -> BTreeSet<Timestamp> {
@@ -348,7 +301,7 @@ mod test {
         let mut doc = Document::default();
         let node_id = Uuid::new_v4();
 
-        let map_id = doc.make_map(node_id);
+        let map_id = doc.make_map("test".into(), node_id);
 
         // The timestamp should now exist in the document
         assert!(doc.maps.contains_key(&map_id));
@@ -359,7 +312,7 @@ mod test {
         let mut doc = Document::default();
         let node_id = Uuid::new_v4();
 
-        let list_id = doc.make_list(node_id);
+        let list_id = doc.make_list("test".into(), node_id);
 
         // The timestamp should now exist in the document
         assert!(doc.list_items.contains_key(&list_id));
@@ -371,14 +324,14 @@ mod test {
         let node_id = Uuid::new_v4();
         let value = Value::from(0);
 
-        let val_id = doc.make_val(value.clone(), node_id);
+        let val_id = doc.make_val(value.clone(), "test".into(), node_id);
 
         // The timestamp should now exist in the document
-        assert_eq!(doc.values.get(&val_id), Some(&value));
+        assert_eq!(doc.values.get(&val_id), Some(&(value, "test".into())));
     }
 
     #[test]
-    fn assign_to_non_existent_object_stores_anyway() {
+    fn assign_to_non_existent_object_skips_application() {
         // TODO: I'm not sure if this is the correct behavior. Should we store
         // random keys where we haven't seen an equivalent `MakeMap`? I could
         // see arguments both directions. On one hand, we want to be resistant
@@ -391,7 +344,7 @@ mod test {
         let non_existent_id = Timestamp::new(999, node_id);
 
         // Create a value to assign
-        let val_id = doc.make_val(0.into(), node_id);
+        let val_id = doc.make_val(0.into(), "test".into(), node_id);
 
         // Try to assign the value to a non-existent object
         doc.assign(
@@ -403,7 +356,7 @@ mod test {
         );
 
         // Check that the assignment entry was created for the non-existent object
-        assert!(doc.maps.contains_key(&non_existent_id));
+        assert!(!doc.maps.contains_key(&non_existent_id));
     }
 
     #[test]
@@ -411,8 +364,8 @@ mod test {
         let mut doc = Document::default();
         let node = Uuid::nil();
 
-        let map_id = doc.make_map(node);
-        let val = doc.make_val(1.into(), node);
+        let map_id = doc.make_map("test".into(), node);
+        let val = doc.make_val(1.into(), "test".into(), node);
 
         let key = "test".to_string();
         let assign_key = AssignKey::MapKey(key.clone());
@@ -429,27 +382,20 @@ mod test {
     mod as_patch {
         use super::*;
         use pretty_assertions::assert_eq;
-        use serde_json::from_value;
-
-        macro_rules! patch {
-            ($patch:tt) => {
-                from_value::<json_patch::Patch>(json!($patch)).unwrap().0
-            };
-        }
 
         #[test]
         fn object_root() {
             let mut doc = Document::default();
-            doc.make_map(Uuid::nil());
+            doc.make_map("test".into(), Uuid::nil());
 
-            assert_eq!(doc.as_patch(), patch!([]));
+            assert_eq!(doc.as_patch(), Vec::new());
         }
 
         #[test]
         fn object_assign() {
             let mut doc = Document::default();
-            let root_id = doc.make_map(Uuid::nil());
-            let val_id = doc.make_val("world".into(), Uuid::nil());
+            let root_id = doc.make_map("test".into(), Uuid::nil());
+            let val_id = doc.make_val("world".into(), "test".into(), Uuid::nil());
             doc.assign(
                 root_id,
                 AssignKey::MapKey("hello".to_string()),
@@ -460,18 +406,20 @@ mod test {
 
             assert_eq!(
                 doc.as_patch(),
-                patch!([
-                    { "op": "add", "path": "/hello", "value": "world" },
-                ])
+                Vec::from([SetOp {
+                    path: Path::from(["hello".into()]),
+                    value: json!("world"),
+                    schema: "test".to_string(),
+                }])
             );
         }
 
         #[test]
         fn list_assign() {
             let mut doc = Document::default();
-            let root_id = doc.make_list(Uuid::nil());
+            let root_id = doc.make_list("test".into(), Uuid::nil());
 
-            let val_a = doc.make_val("hello".into(), Uuid::nil());
+            let val_a = doc.make_val("hello".into(), "test".into(), Uuid::nil());
             let insert_a = doc.insert_after(root_id, Uuid::nil());
             doc.assign(
                 root_id,
@@ -481,7 +429,7 @@ mod test {
                 Uuid::nil(),
             );
 
-            let val_b = doc.make_val("howdy".into(), Uuid::nil());
+            let val_b = doc.make_val("howdy".into(), "test".into(), Uuid::nil());
             let insert_b = doc.insert_after(insert_a, Uuid::nil());
             doc.assign(
                 root_id,
@@ -493,9 +441,17 @@ mod test {
 
             assert_eq!(
                 doc.as_patch(),
-                patch!([
-                    { "op": "add", "path": "/0", "value": "hello" },
-                    { "op": "add", "path": "/1", "value": "howdy" },
+                Vec::from([
+                    SetOp {
+                        path: Path::from([0.into()]),
+                        value: json!("hello"),
+                        schema: "test".to_string(),
+                    },
+                    SetOp {
+                        path: Path::from([1.into()]),
+                        value: json!("howdy"),
+                        schema: "test".to_string(),
+                    }
                 ])
             );
         }
@@ -503,9 +459,9 @@ mod test {
         #[test]
         fn deep_assign_map() {
             let mut doc = Document::default();
-            let root_id = doc.make_map(Uuid::nil());
+            let root_id = doc.make_map("test".into(), Uuid::nil());
 
-            let greetings_id = doc.make_map(Uuid::nil());
+            let greetings_id = doc.make_map("test".into(), Uuid::nil());
             doc.assign(
                 root_id,
                 AssignKey::MapKey("greetings".into()),
@@ -514,7 +470,7 @@ mod test {
                 Uuid::nil(),
             );
 
-            let world_id = doc.make_val("world".into(), Uuid::nil());
+            let world_id = doc.make_val("world".into(), "test".into(), Uuid::nil());
             doc.assign(
                 greetings_id,
                 AssignKey::MapKey("hello".to_string()),
@@ -525,9 +481,17 @@ mod test {
 
             assert_eq!(
                 doc.as_patch(),
-                patch!([
-                    { "op": "add", "path": "/greetings", "value": {} },
-                    { "op": "add", "path": "/greetings/hello", "value": "world" },
+                Vec::from([
+                    SetOp {
+                        path: Path::from(["greetings".into()]),
+                        value: json!({}),
+                        schema: "test".to_string(),
+                    },
+                    SetOp {
+                        path: Path::from(["greetings".into(), "hello".into()]),
+                        value: json!("world"),
+                        schema: "test".to_string(),
+                    }
                 ])
             );
         }
@@ -535,9 +499,9 @@ mod test {
         #[test]
         fn deep_assign_list() {
             let mut doc = Document::default();
-            let root_id = doc.make_map(Uuid::nil());
+            let root_id = doc.make_map("test".into(), Uuid::nil());
 
-            let greetings_id = doc.make_list(Uuid::nil());
+            let greetings_id = doc.make_list("test".into(), Uuid::nil());
             doc.assign(
                 root_id,
                 AssignKey::MapKey("greetings".into()),
@@ -547,7 +511,7 @@ mod test {
             );
 
             let insert_id = doc.insert_after(greetings_id, Uuid::nil());
-            let world_id = doc.make_val("world".into(), Uuid::nil());
+            let world_id = doc.make_val("world".into(), "test".into(), Uuid::nil());
             doc.assign(
                 greetings_id,
                 AssignKey::InsertAfter(insert_id),
@@ -558,9 +522,17 @@ mod test {
 
             assert_eq!(
                 doc.as_patch(),
-                patch!([
-                    { "op": "add", "path": "/greetings", "value": [] },
-                    { "op": "add", "path": "/greetings/0", "value": "world" },
+                Vec::from([
+                    SetOp {
+                        path: Path::from(["greetings".into()]),
+                        value: json!([]),
+                        schema: "test".to_string(),
+                    },
+                    SetOp {
+                        path: Path::from(["greetings".into(), 0.into()]),
+                        value: json!("world"),
+                        schema: "test".to_string(),
+                    }
                 ])
             );
         }

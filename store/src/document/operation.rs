@@ -5,10 +5,15 @@ use std::collections::BTreeSet;
 #[derive(Debug, PartialOrd, PartialEq, Clone)]
 #[repr(C)]
 pub enum Operation {
-    MakeMap,
-    MakeList,
+    MakeMap {
+        schema: String,
+    },
+    MakeList {
+        schema: String,
+    },
     MakeVal {
         val: Value,
+        schema: String,
     },
     InsertAfter {
         prev: Timestamp,

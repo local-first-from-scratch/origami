@@ -40,19 +40,17 @@ impl Handle {
     /// Get the current value. In cases where there is more than one current
     /// value, this will give you an arbitrary (but consistent) result.
     pub fn current(&self) -> Result<JsValue, JsString> {
-        let doc = self.doc.read().map_err(|e| e.to_string())?;
-
-        serde_wasm_bindgen::to_value(&doc.as_value()).map_err(|e| e.to_string().into())
+        Err("Unimplemented".into())
     }
 
     /// Assign a value in a map at the current location.
-    pub fn set(&self, key: JsString, value: JsValue) -> Result<(), Error> {
+    pub fn set(&self, key: JsString, value: JsValue, schema: JsString) -> Result<(), Error> {
         // Make the write
         {
             let mut doc = self.doc.write()?;
             let root = *doc.root().ok_or(Error::MissingRoot)?;
 
-            let val_id = doc.make_val(value.try_into()?, *self.actor);
+            let val_id = doc.make_val(value.try_into()?, schema.into(), *self.actor);
 
             let key = crate::document::AssignKey::MapKey(key.into());
 

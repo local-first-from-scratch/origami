@@ -28,11 +28,11 @@ pub fn dry_run() -> Result<JsValue, serde_wasm_bindgen::Error> {
     log(&format!("{doc:#?}"));
 
     {
-        let map_id = doc.make_map(node);
+        let map_id = doc.make_map("test".into(), node);
         log(&format!("new map: {map_id:#?}"));
         log(&format!("doc is now: {doc:#?}"));
 
-        let world_id = doc.make_val("World".into(), node);
+        let world_id = doc.make_val("World".into(), "test".into(), node);
         doc.assign(
             map_id,
             AssignKey::MapKey("hello".into()),
@@ -41,7 +41,7 @@ pub fn dry_run() -> Result<JsValue, serde_wasm_bindgen::Error> {
             node,
         );
 
-        let list_id = doc.make_list(node);
+        let list_id = doc.make_list("test".into(), node);
         doc.assign(
             map_id,
             AssignKey::MapKey("list".into()),
@@ -94,7 +94,5 @@ pub fn dry_run() -> Result<JsValue, serde_wasm_bindgen::Error> {
 
     log(&format!("new doc: {doc:#?}"));
 
-    let v = doc.as_value();
-    log(&format!("{v:#?}"));
-    serde_wasm_bindgen::to_value(&doc.as_patch())
+    serde_wasm_bindgen::to_value(&patch::to_value(&doc.as_patch()).unwrap())
 }
