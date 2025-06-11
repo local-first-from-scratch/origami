@@ -26,6 +26,12 @@ impl From<usize> for KeyOrIndex {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Path(Vec<KeyOrIndex>);
 
+impl Default for Path {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Path {
     pub fn new() -> Self {
         Self(Vec::new())

@@ -5,7 +5,6 @@ mod value;
 
 use crate::timestamp::Timestamp;
 use assign::Assign;
-use json_patch::{AddOperation, PatchOperation, jsonptr::PointerBuf};
 pub use operation::AssignKey;
 use operation::Operation;
 use order::Order;
@@ -383,13 +382,6 @@ mod test {
     mod as_patch {
         use super::*;
         use pretty_assertions::assert_eq;
-        use serde_json::from_value;
-
-        macro_rules! patch {
-            ($patch:tt) => {
-                from_value::<json_patch::Patch>(json!($patch)).unwrap().0
-            };
-        }
 
         #[test]
         fn object_root() {
