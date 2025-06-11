@@ -1,24 +1,7 @@
+mod path;
+
+pub use path::{KeyOrIndex, Path};
 use serde_json::{Value, json};
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum KeyOrIndex {
-    Key(String),
-    LastIndex,
-}
-
-impl From<String> for KeyOrIndex {
-    fn from(v: String) -> Self {
-        Self::Key(v)
-    }
-}
-
-impl From<&str> for KeyOrIndex {
-    fn from(v: &str) -> Self {
-        Self::Key(v.to_string())
-    }
-}
-
-pub type Path = Vec<KeyOrIndex>;
 
 #[derive(Debug)]
 pub struct SetOp {
@@ -33,7 +16,7 @@ pub fn to_value(patches: &Vec<SetOp>) -> Result<Value, Error> {
     for patch in patches {
         let mut cursor = &mut base;
 
-        for segment in patch.path.iter().take(patch.path.len().max(1) - 1) {
+        for segment in patch.path.all_but_last() {
             match (segment, cursor) {
                 (KeyOrIndex::Key(key), Value::Object(map)) => match map.get_mut(key) {
                     Some(next) => cursor = next,
