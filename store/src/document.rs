@@ -328,7 +328,7 @@ mod test {
     }
 
     #[test]
-    fn assign_to_non_existent_object_stores_anyway() {
+    fn assign_to_non_existent_object_skips_application() {
         // TODO: I'm not sure if this is the correct behavior. Should we store
         // random keys where we haven't seen an equivalent `MakeMap`? I could
         // see arguments both directions. On one hand, we want to be resistant
@@ -353,7 +353,7 @@ mod test {
         );
 
         // Check that the assignment entry was created for the non-existent object
-        assert!(doc.maps.contains_key(&non_existent_id));
+        assert!(!doc.maps.contains_key(&non_existent_id));
     }
 
     #[test]
