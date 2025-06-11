@@ -80,6 +80,13 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
+  cargo-machete:
+    name: Cargo Machete
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bnjbvr/cargo-machete@main
+
   frontend-lint:
     name: Frontend Lint
     runs-on: ubuntu-latest
