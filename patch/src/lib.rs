@@ -3,7 +3,7 @@ mod path;
 pub use path::{KeyOrIndex, Path};
 use serde_json::{Value, json};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct SetOp {
     pub path: Path,
     pub value: Value,

@@ -9,6 +9,7 @@ use json_patch::{AddOperation, PatchOperation, jsonptr::PointerBuf};
 pub use operation::AssignKey;
 use operation::Operation;
 use order::Order;
+use patch::{Path, SetOp};
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use uuid::Uuid;
@@ -195,9 +196,9 @@ impl Document {
         id
     }
 
-    pub fn as_patch(&self) -> Vec<PatchOperation> {
+    pub fn as_patch(&self) -> Vec<SetOp> {
         let mut ops = Vec::new();
-        let here = PointerBuf::new();
+        let here = Path::new();
 
         if let Some(root) = self.root() {
             self.push_patch(root, here, &mut ops)
@@ -206,16 +207,17 @@ impl Document {
         ops
     }
 
-    fn push_patch(&self, id: &Timestamp, here: PointerBuf, ops: &mut Vec<PatchOperation>) {
+    fn push_patch(&self, id: &Timestamp, here: Path, ops: &mut Vec<SetOp>) {
         if self.maps.contains_key(id) {
             self.push_map_patches(id, here, ops)
         } else if self.list_items.contains_key(id) {
             self.push_list_patches(id, here, ops)
-        } else if let Some((val, _schema)) = self.values.get(id) {
-            ops.push(PatchOperation::Add(AddOperation {
-                path: here,
+        } else if let Some((val, schema)) = self.values.get(id) {
+            ops.push(SetOp {
+                path: here.clone(),
                 value: val.into(),
-            }))
+                schema: schema.clone(),
+            })
         } else {
             // TODO: a better error if we don't have all the values we expected.
             // This shouldn't happen (it can currently happen if you remove an
@@ -227,18 +229,19 @@ impl Document {
 
     /// Push JSON patches to the `ops`, assuming that the ID has already been
     /// validated as a map. If that assumption does not hold, this is a no-op.
-    fn push_map_patches(&self, id: &Timestamp, here: PointerBuf, ops: &mut Vec<PatchOperation>) {
+    fn push_map_patches(&self, id: &Timestamp, here: Path, ops: &mut Vec<SetOp>) {
         if let Some(assign) = self.maps.get(id) {
             if !here.is_root() {
-                ops.push(PatchOperation::Add(AddOperation {
+                ops.push(SetOp {
                     path: here.clone(),
                     value: json!({}),
-                }));
+                    schema: assign.schema.clone(),
+                });
             }
 
             for (k, v) in assign.iter_map() {
                 if v.len() == 1 {
-                    self.push_patch(v[0], here.with_trailing_token(k), ops);
+                    self.push_patch(v[0], here.with_next_segment(k.into()), ops);
                 } else {
                     todo!("multiple-valued key in map")
                 }
@@ -247,13 +250,14 @@ impl Document {
     }
 
     /// Push JSON patches to the `ops`, assuming that the ID has already been validated as a list.
-    fn push_list_patches(&self, id: &Timestamp, here: PointerBuf, ops: &mut Vec<PatchOperation>) {
+    fn push_list_patches(&self, id: &Timestamp, here: Path, ops: &mut Vec<SetOp>) {
         if let Some(assign) = self.list_items.get(id) {
             if !here.is_root() {
-                ops.push(PatchOperation::Add(AddOperation {
+                ops.push(SetOp {
                     path: here.clone(),
                     value: json!([]),
-                }));
+                    schema: assign.schema.clone(),
+                });
             }
 
             for (index, item_id) in self.list_ordering.iter(id).enumerate() {
@@ -261,7 +265,7 @@ impl Document {
                     if values.len() == 1 {
                         self.push_patch(
                             values.first_key_value().unwrap().1,
-                            here.with_trailing_token(index),
+                            here.with_next_segment(index.into()),
                             ops,
                         )
                     } else {
@@ -392,7 +396,7 @@ mod test {
             let mut doc = Document::default();
             doc.make_map("test".into(), Uuid::nil());
 
-            assert_eq!(doc.as_patch(), patch!([]));
+            assert_eq!(doc.as_patch(), Vec::new());
         }
 
         #[test]
@@ -410,9 +414,11 @@ mod test {
 
             assert_eq!(
                 doc.as_patch(),
-                patch!([
-                    { "op": "add", "path": "/hello", "value": "world" },
-                ])
+                Vec::from([SetOp {
+                    path: Path::from(["hello".into()]),
+                    value: json!("world"),
+                    schema: "test".to_string(),
+                }])
             );
         }
 
@@ -443,9 +449,17 @@ mod test {
 
             assert_eq!(
                 doc.as_patch(),
-                patch!([
-                    { "op": "add", "path": "/0", "value": "hello" },
-                    { "op": "add", "path": "/1", "value": "howdy" },
+                Vec::from([
+                    SetOp {
+                        path: Path::from([0.into()]),
+                        value: json!("hello"),
+                        schema: "test".to_string(),
+                    },
+                    SetOp {
+                        path: Path::from([1.into()]),
+                        value: json!("howdy"),
+                        schema: "test".to_string(),
+                    }
                 ])
             );
         }
@@ -475,9 +489,17 @@ mod test {
 
             assert_eq!(
                 doc.as_patch(),
-                patch!([
-                    { "op": "add", "path": "/greetings", "value": {} },
-                    { "op": "add", "path": "/greetings/hello", "value": "world" },
+                Vec::from([
+                    SetOp {
+                        path: Path::from(["greetings".into()]),
+                        value: json!({}),
+                        schema: "test".to_string(),
+                    },
+                    SetOp {
+                        path: Path::from(["greetings".into(), "hello".into()]),
+                        value: json!("world"),
+                        schema: "test".to_string(),
+                    }
                 ])
             );
         }
@@ -508,9 +530,17 @@ mod test {
 
             assert_eq!(
                 doc.as_patch(),
-                patch!([
-                    { "op": "add", "path": "/greetings", "value": [] },
-                    { "op": "add", "path": "/greetings/0", "value": "world" },
+                Vec::from([
+                    SetOp {
+                        path: Path::from(["greetings".into()]),
+                        value: json!([]),
+                        schema: "test".to_string(),
+                    },
+                    SetOp {
+                        path: Path::from(["greetings".into(), 0.into()]),
+                        value: json!("world"),
+                        schema: "test".to_string(),
+                    }
                 ])
             );
         }

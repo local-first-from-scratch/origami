@@ -1014,6 +1014,7 @@ dependencies = [
  "console_error_panic_hook",
  "js-sys",
  "json-patch",
+ "patch",
  "pretty_assertions",
  "proptest",
  "proptest-derive",
