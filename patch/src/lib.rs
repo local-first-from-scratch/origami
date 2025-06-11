@@ -1,9 +1,21 @@
 use serde_json::{Value, json};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum KeyOrIndex {
     Key(String),
     LastIndex,
+}
+
+impl From<String> for KeyOrIndex {
+    fn from(v: String) -> Self {
+        Self::Key(v)
+    }
+}
+
+impl From<&str> for KeyOrIndex {
+    fn from(v: &str) -> Self {
+        Self::Key(v.to_string())
+    }
 }
 
 pub type Path = Vec<KeyOrIndex>;
@@ -20,7 +32,8 @@ pub fn to_value(patches: &Vec<SetOp>) -> Result<Value, Error> {
 
     for patch in patches {
         let mut cursor = &mut base;
-        for segment in patch.path.iter().take(patch.path.len() - 1) {
+
+        for segment in patch.path.iter().take(patch.path.len().max(1) - 1) {
             match (segment, cursor) {
                 (KeyOrIndex::Key(key), Value::Object(map)) => match map.get_mut(key) {
                     Some(next) => cursor = next,
@@ -55,7 +68,7 @@ pub fn to_value(patches: &Vec<SetOp>) -> Result<Value, Error> {
     Ok(base)
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq)]
 pub enum Error {
     #[error("Could not navigate to path {0:?}")]
     CouldNotNavigateToPath(Path),
@@ -78,5 +91,101 @@ mod test {
         }];
 
         assert_eq!(to_value(&patches).unwrap(), json!({}));
+    }
+
+    #[test]
+    fn set_value() {
+        let patches = vec![SetOp {
+            path: Path::from(["key".into()]),
+            value: json!(1),
+            schema: "test".to_string(),
+        }];
+
+        assert_eq!(to_value(&patches).unwrap(), json!({"key": 1}));
+    }
+
+    #[test]
+    fn append_to_list() {
+        let patches = vec![
+            SetOp {
+                path: Path::from(["list".into()]),
+                value: json!([]),
+                schema: "test".to_string(),
+            },
+            SetOp {
+                path: Path::from(["list".into(), KeyOrIndex::LastIndex]),
+                value: json!(1),
+                schema: "test".to_string(),
+            },
+        ];
+
+        assert_eq!(to_value(&patches).unwrap(), json!({"list": [1]}));
+    }
+
+    #[test]
+    fn cannot_navigate_to_string_key() {
+        let path = Path::from(["hello".into(), "world".into()]);
+        let patches = vec![SetOp {
+            path: path.clone(),
+            value: json!("hello"),
+            schema: "test".to_string(),
+        }];
+
+        assert_eq!(to_value(&patches), Err(Error::CouldNotNavigateToPath(path)));
+    }
+
+    #[test]
+    fn cannot_navigate_through_list() {
+        let path = Path::from(["hello".into(), KeyOrIndex::LastIndex, "world".into()]);
+        let patches = vec![
+            SetOp {
+                path: Path::from(["hello".into()]),
+                value: json!([]),
+                schema: "test".to_string(),
+            },
+            SetOp {
+                path: path.clone(),
+                value: json!(1),
+                schema: "test".to_string(),
+            },
+        ];
+
+        assert_eq!(to_value(&patches), Err(Error::CouldNotNavigateToPath(path)));
+    }
+
+    #[test]
+    fn wrong_type_for_navigation() {
+        let patches = vec![
+            SetOp {
+                path: Path::new(),
+                value: json!(1),
+                schema: "test".to_string(),
+            },
+            SetOp {
+                path: Path::from(["key".into()]),
+                value: json!(1),
+                schema: "test".to_string(),
+            },
+        ];
+
+        assert!(matches!(to_value(&patches), Err(Error::WrongType)));
+    }
+
+    #[test]
+    fn wrong_type_for_assignment() {
+        let patches = vec![
+            SetOp {
+                path: Path::new(),
+                value: json!("hello"),
+                schema: "test".to_string(),
+            },
+            SetOp {
+                path: Path::from([KeyOrIndex::LastIndex]),
+                value: json!(1),
+                schema: "test".to_string(),
+            },
+        ];
+
+        assert!(matches!(to_value(&patches), Err(Error::WrongType)));
     }
 }
