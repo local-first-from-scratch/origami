@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum KeyOrIndex {
     Key(String),
     Index(usize),
@@ -23,7 +23,7 @@ impl From<usize> for KeyOrIndex {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Path(Vec<KeyOrIndex>);
 
 impl Default for Path {
