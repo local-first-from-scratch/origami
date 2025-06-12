@@ -1,5 +1,5 @@
 use jtd::{FromSerdeSchemaError, Schema, SerdeSchema};
-use patch::Path;
+use patch::{KeyOrIndex, Path};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
@@ -348,7 +348,20 @@ impl Lens {
     /// Transform the path of a patch. Returns an indicator of whether the path
     /// should be kept after this lens: true to keep, false to remove.
     pub fn transform_path(&self, path: &mut Path) -> bool {
-        todo!()
+        match self {
+            Lens::Add(..) => true,
+            Lens::Remove(AddRemove { name, .. }) => path.first().is_none_or(
+                |first| matches!(first, KeyOrIndex::Key(first_name) if first_name != name),
+            ),
+            Lens::Rename(..) => true,
+            Lens::Extract(..) => true,
+            Lens::Embed(..) => true,
+            Lens::Head(..) => true,
+            Lens::Wrap(..) => true,
+            Lens::In(..) => true,
+            Lens::Map(..) => true,
+            Lens::Convert(..) => true,
+        }
     }
 
     pub fn transform_value(&self, value: &mut Value) {
@@ -1112,6 +1125,53 @@ mod test {
                     Box::new(actual_type)
                 ))
             );
+        }
+    }
+
+    mod transform_path {
+        use super::*;
+        use pretty_assertions::assert_eq;
+
+        #[test]
+        fn add_always_keeps() {
+            let lens = lens!({
+                "add": {
+                    "name": "new",
+                    "type": {"type": "string"}
+                }
+            });
+
+            let keep = lens.transform_path(&mut Path::new());
+
+            assert!(keep)
+        }
+
+        #[test]
+        fn remove_keeps_if_path_not_same() {
+            let lens = lens!({
+                "remove": {
+                    "name": "name",
+                    "type": {"type": "string"}
+                }
+            });
+
+            let keep = lens.transform_path(&mut Path::new());
+
+            assert!(keep)
+        }
+
+        #[test]
+        fn remove_removes_if_path_matches() {
+            let lens = lens!({
+                "remove": {
+                    "name": "name",
+                    "type": {"type": "string"}
+                }
+            });
+
+            let keep = lens.transform_path(&mut Path::from(["name".into()]));
+
+            assert!(!keep)
         }
     }
 }

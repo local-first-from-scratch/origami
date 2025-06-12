@@ -47,6 +47,10 @@ impl Path {
         path
     }
 
+    pub fn first(&self) -> Option<&KeyOrIndex> {
+        self.0.first()
+    }
+
     pub fn all_but_last(&self) -> impl Iterator<Item = &KeyOrIndex> {
         self.0.iter().take(self.0.len().max(1) - 1)
     }
