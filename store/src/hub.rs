@@ -1,4 +1,5 @@
 mod handle;
+mod reader;
 mod subscriptions;
 
 use crate::document::Document;

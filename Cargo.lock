@@ -569,6 +569,7 @@ dependencies = [
  "clap",
  "color-eyre",
  "jtd",
+ "patch",
  "petgraph",
  "pretty_assertions",
  "serde",
@@ -991,6 +992,7 @@ version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
  "js-sys",
+ "migrate",
  "patch",
  "pretty_assertions",
  "proptest",

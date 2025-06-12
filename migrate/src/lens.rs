@@ -1,4 +1,5 @@
 use jtd::{FromSerdeSchemaError, Schema, SerdeSchema};
+use patch::Path;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
@@ -342,6 +343,16 @@ impl Lens {
             Lens::Map(..) => "map",
             Lens::Convert(..) => "convert",
         }
+    }
+
+    /// Transform the path of a patch. Returns an indicator of whether the path
+    /// should be kept after this lens: true to keep, false to remove.
+    pub fn transform_path(&self, path: &mut Path) -> bool {
+        todo!()
+    }
+
+    pub fn transform_value(&self, value: &mut Value) {
+        todo!()
     }
 }
 
