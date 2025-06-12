@@ -4,7 +4,7 @@ use color_eyre::{
     eyre::{Context, ContextCompat},
 };
 use jtd::Schema;
-use migration::{migration::Migration, migrator::Migrator};
+use migrate::{Migration, Migrator};
 use std::path::PathBuf;
 use std::{
     collections::BTreeMap,
