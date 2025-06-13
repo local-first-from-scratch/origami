@@ -353,7 +353,13 @@ impl Lens {
             Lens::Remove(AddRemove { name, .. }) => path.first().is_none_or(
                 |first| matches!(first, KeyOrIndex::Key(first_name) if first_name != name),
             ),
-            Lens::Rename(..) => true,
+            Lens::Rename(Rename { from, to }) => {
+                if matches!(path.first(), Some(KeyOrIndex::Key(segment)) if segment == from) {
+                    path[0] = KeyOrIndex::Key(to.clone());
+                }
+
+                true
+            }
             Lens::Extract(..) => true,
             Lens::Embed(..) => true,
             Lens::Head(..) => true,
@@ -1172,6 +1178,41 @@ mod test {
             let keep = lens.transform_path(&mut Path::from(["name".into()]));
 
             assert!(!keep)
+        }
+
+        #[test]
+        fn rename_skips_if_path_not_same() {
+            let lens = lens!({
+                "rename": {
+                    "from": "old",
+                    "to": "new"
+                }
+            });
+
+            let mut path = Path::from(["whatever".into()]);
+            let orig = path.clone();
+
+            let keep = lens.transform_path(&mut path);
+
+            assert!(keep);
+            assert_eq!(path, orig);
+        }
+
+        #[test]
+        fn rename_renames_if_path_matches() {
+            let lens = lens!({
+                "rename": {
+                    "from": "old",
+                    "to": "new"
+                }
+            });
+
+            let mut path = Path::from(["old".into()]);
+
+            let keep = lens.transform_path(&mut path);
+
+            assert!(keep);
+            assert_eq!(path, Path::from(["new".into()]));
         }
     }
 }
