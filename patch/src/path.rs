@@ -1,3 +1,5 @@
+use std::ops::{Index, IndexMut};
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum KeyOrIndex {
     Key(String),
@@ -63,6 +65,20 @@ impl Path {
 impl<const N: usize> From<[KeyOrIndex; N]> for Path {
     fn from(v: [KeyOrIndex; N]) -> Self {
         Self(v.to_vec())
+    }
+}
+
+impl Index<usize> for Path {
+    type Output = KeyOrIndex;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl IndexMut<usize> for Path {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
     }
 }
 
