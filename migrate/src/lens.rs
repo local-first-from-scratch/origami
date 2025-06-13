@@ -1163,9 +1163,13 @@ mod test {
         use super::*;
         use pretty_assertions::assert_eq;
 
-        macro_rules! assert_keep {
-            ($path:expr) => {
-                assert_eq!(PathMeta::Keep, $path);
+        macro_rules! assert_no_op {
+            ($lens:expr, $path:expr) => {
+                let mut orig = $path;
+                let unchanged = orig.clone();
+                let meta = $lens.transform_path(&mut orig);
+                assert_eq!(PathMeta::Keep, meta);
+                assert_eq!(unchanged, orig);
             };
         }
 
@@ -1178,7 +1182,7 @@ mod test {
                 }
             });
 
-            assert_keep!(lens.transform_path(&mut Path::new()));
+            assert_no_op!(lens, Path::new());
         }
 
         #[test]
@@ -1190,7 +1194,7 @@ mod test {
                 }
             });
 
-            assert_keep!(lens.transform_path(&mut Path::new()));
+            assert_no_op!(lens, Path::new());
         }
 
         #[test]
@@ -1215,11 +1219,7 @@ mod test {
                 }
             });
 
-            let mut path = Path::from(["whatever".into()]);
-            let orig = path.clone();
-
-            assert_keep!(lens.transform_path(&mut path));
-            assert_eq!(path, orig);
+            assert_no_op!(lens, Path::from(["whatever".into()]));
         }
 
         #[test]
@@ -1233,7 +1233,7 @@ mod test {
 
             let mut path = Path::from(["old".into()]);
 
-            assert_keep!(lens.transform_path(&mut path));
+            assert_eq!(PathMeta::Keep, lens.transform_path(&mut path));
             assert_eq!(path, Path::from(["new".into()]));
         }
 
@@ -1246,11 +1246,7 @@ mod test {
                 }
             });
 
-            let mut path = Path::from(["other_host".into(), "id".into()]);
-            let orig = path.clone();
-
-            assert_keep!(lens.transform_path(&mut path));
-            assert_eq!(path, orig);
+            assert_no_op!(lens, Path::from(["other_host".into(), "id".into()]));
         }
 
         #[test]
@@ -1278,7 +1274,7 @@ mod test {
 
             let mut path = Path::from(["user".into(), "id".into()]);
 
-            assert_keep!(lens.transform_path(&mut path));
+            assert_eq!(PathMeta::Keep, lens.transform_path(&mut path));
             assert_eq!(path, Path::from(["user".into()]));
         }
     }
