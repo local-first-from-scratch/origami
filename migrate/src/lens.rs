@@ -366,7 +366,6 @@ impl Lens {
                     Some(KeyOrIndex::Key(host_segment)) if host_segment == host => {
                         match path.get(1) {
                             Some(KeyOrIndex::Key(name_segment)) if name_segment == name => {
-                                path[0] = KeyOrIndex::Key(name.clone());
                                 path.remove(1);
 
                                 PathMeta::Keep
@@ -1280,7 +1279,7 @@ mod test {
             let mut path = Path::from(["user".into(), "id".into()]);
 
             assert_keep!(lens.transform_path(&mut path));
-            assert_eq!(path, Path::from(["id".into()]));
+            assert_eq!(path, Path::from(["user".into()]));
         }
     }
 }
