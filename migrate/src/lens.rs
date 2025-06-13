@@ -397,7 +397,7 @@ impl Lens {
         }
     }
 
-    pub fn transform_value(&self, value: &mut Value) {
+    pub fn transform_value(&self, _value: &mut Value) {
         todo!()
     }
 }
