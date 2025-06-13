@@ -1,4 +1,4 @@
-use migrate::{Lens, Migrator};
+use migrate::{Lens, Migrator, PathMeta};
 use patch::{Path, SetOp};
 use serde_json::Value;
 use std::collections::{BTreeMap, btree_map::Entry};
@@ -55,9 +55,11 @@ impl<'m> Reader<'m> {
         } = patch;
 
         for lens in self.migration_path(schema)? {
-            if lens.transform_path(&mut path) {
-                return Ok(());
-            };
+            match lens.transform_path(&mut path) {
+                PathMeta::Keep => (),
+                PathMeta::KeepAndAddHost(path) => todo!("handle adding {path:?}"),
+                PathMeta::Remove => return Ok(()),
+            }
 
             lens.transform_value(&mut value);
         }
