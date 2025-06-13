@@ -68,6 +68,10 @@ impl Path {
     pub fn remove(&mut self, index: usize) {
         self.0.remove(index);
     }
+
+    pub fn insert(&mut self, index: usize, element: KeyOrIndex) {
+        self.0.insert(index, element);
+    }
 }
 
 impl<const N: usize> From<[KeyOrIndex; N]> for Path {
