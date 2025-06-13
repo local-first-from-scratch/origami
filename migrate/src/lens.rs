@@ -379,7 +379,16 @@ impl Lens {
                     _ => PathMeta::Keep,
                 }
             }
-            Lens::Embed(..) => todo!("Lens::Embed"),
+            Lens::Embed(ExtractEmbed { host, name }) => {
+                if matches!(path.get(0), Some(KeyOrIndex::Key(host_segment)) if host_segment == host)
+                {
+                    path.insert(1, name.into());
+
+                    PathMeta::KeepAndAddHost(Path::from([path[0].clone()]))
+                } else {
+                    PathMeta::Keep
+                }
+            }
             Lens::Head(..) => todo!("Lens::Head"),
             Lens::Wrap(..) => todo!("Lens::Wrap"),
             Lens::In(..) => todo!("Lens::In"),
@@ -1276,6 +1285,36 @@ mod test {
 
             assert_eq!(PathMeta::Keep, lens.transform_path(&mut path));
             assert_eq!(path, Path::from(["user".into()]));
+        }
+
+        #[test]
+        fn embed_skips_if_host_is_wrong() {
+            let lens = lens!({
+                "embed": {
+                    "host": "user",
+                    "name": "id"
+                }
+            });
+
+            assert_no_op!(lens, Path::from(["other_host".into()]));
+        }
+
+        #[test]
+        fn embed_embeds_if_host_matches() {
+            let lens = lens!({
+                "embed": {
+                    "host": "user",
+                    "name": "id"
+                }
+            });
+
+            let mut path = Path::from(["user".into()]);
+
+            assert_eq!(
+                PathMeta::KeepAndAddHost(path.clone()),
+                lens.transform_path(&mut path)
+            );
+            assert_eq!(path, Path::from(["user".into(), "id".into()]));
         }
     }
 }
