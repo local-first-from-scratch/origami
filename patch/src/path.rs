@@ -1,4 +1,4 @@
-use std::ops::{Index, IndexMut};
+use std::ops::{Index, IndexMut, Range, RangeBounds, RangeInclusive};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum KeyOrIndex {
@@ -80,10 +80,24 @@ impl<const N: usize> From<[KeyOrIndex; N]> for Path {
     }
 }
 
+impl From<&[KeyOrIndex]> for Path {
+    fn from(v: &[KeyOrIndex]) -> Self {
+        Self(v.to_vec())
+    }
+}
+
 impl Index<usize> for Path {
     type Output = KeyOrIndex;
 
     fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl Index<RangeInclusive<usize>> for Path {
+    type Output = [KeyOrIndex];
+
+    fn index(&self, index: RangeInclusive<usize>) -> &Self::Output {
         &self.0[index]
     }
 }

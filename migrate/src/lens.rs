@@ -393,7 +393,21 @@ impl Lens {
                     PathMeta::Keep
                 }
             }
-            Lens::Head(..) => todo!("Lens::Head"),
+            Lens::Head(WrapHead { name }) => match path.get(index) {
+                Some(KeyOrIndex::Key(name_segment)) if name_segment == name => {
+                    match path.get(index + 1) {
+                        Some(KeyOrIndex::Index(0)) => {
+                            path.remove(index + 1);
+
+                            PathMeta::Keep
+                        }
+                        // We need to remove all the other elements in this list
+                        // but the head.
+                        _ => PathMeta::Remove,
+                    }
+                }
+                _ => PathMeta::Keep,
+            },
             Lens::Wrap(..) => todo!("Lens::Wrap"),
             Lens::In(..) => todo!("Lens::In"),
             Lens::Map(..) => todo!("Lens::Map"),
@@ -1319,6 +1333,44 @@ mod test {
                 lens.transform_path(&mut path)
             );
             assert_eq!(path, Path::from(["user".into(), "id".into()]));
+        }
+
+        #[test]
+        fn head_skips_if_name_is_wrong() {
+            let lens = lens!({
+                "head": {
+                    "name": "items"
+                }
+            });
+
+            assert_no_op!(lens, Path::from(["other_name".into()]));
+        }
+
+        #[test]
+        fn head_extracts_head_element() {
+            let lens = lens!({
+                "head": {
+                    "name": "items"
+                }
+            });
+
+            let mut path = Path::from(["items".into(), 0.into()]);
+
+            assert_eq!(PathMeta::Keep, lens.transform_path(&mut path));
+            assert_eq!(path, Path::from(["items".into()]));
+        }
+
+        #[test]
+        fn head_removes_non_head_elements() {
+            let lens = lens!({
+                "head": {
+                    "name": "items"
+                }
+            });
+
+            let meta = lens.transform_path(&mut Path::from(["items".into(), 1.into()]));
+
+            assert_eq!(PathMeta::Remove, meta);
         }
     }
 }
