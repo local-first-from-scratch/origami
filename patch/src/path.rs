@@ -60,6 +60,14 @@ impl Path {
     pub fn last(&self) -> Option<&KeyOrIndex> {
         self.0.last()
     }
+
+    pub fn get(&self, arg: usize) -> Option<&KeyOrIndex> {
+        self.0.get(arg)
+    }
+
+    pub fn remove(&mut self, index: usize) {
+        self.0.remove(index);
+    }
 }
 
 impl<const N: usize> From<[KeyOrIndex; N]> for Path {

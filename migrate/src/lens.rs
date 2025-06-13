@@ -360,7 +360,25 @@ impl Lens {
 
                 true
             }
-            Lens::Extract(..) => true,
+            Lens::Extract(ExtractEmbed { host, name }) => {
+                match path.get(0) {
+                    Some(KeyOrIndex::Key(host_segment)) if host_segment == host => {
+                        match path.get(1) {
+                            Some(KeyOrIndex::Key(name_segment)) if name_segment == name => {
+                                path[0] = KeyOrIndex::Key(name.clone());
+                                path.remove(1);
+
+                                true
+                            }
+                            // If the host matched but the name didn't, we're
+                            // extracting out of the object anyway and should
+                            // drop other keys.
+                            _ => false,
+                        }
+                    }
+                    _ => true,
+                }
+            }
             Lens::Embed(..) => true,
             Lens::Head(..) => true,
             Lens::Wrap(..) => true,
@@ -1213,6 +1231,55 @@ mod test {
 
             assert!(keep);
             assert_eq!(path, Path::from(["new".into()]));
+        }
+
+        #[test]
+        fn extract_skips_if_host_is_wrong() {
+            let lens = lens!({
+                "extract": {
+                    "host": "user",
+                    "name": "id"
+                }
+            });
+
+            let mut path = Path::from(["other_host".into(), "id".into()]);
+            let orig = path.clone();
+
+            let keep = lens.transform_path(&mut path);
+
+            assert!(keep);
+            assert_eq!(path, orig);
+        }
+
+        #[test]
+        fn extract_removes_other_names_within_host() {
+            let lens = lens!({
+                "extract": {
+                    "host": "user",
+                    "name": "id"
+                }
+            });
+
+            let keep = lens.transform_path(&mut Path::from(["user".into(), "other_name".into()]));
+
+            assert!(!keep);
+        }
+
+        #[test]
+        fn extract_extracts_if_both_match() {
+            let lens = lens!({
+                "extract": {
+                    "host": "user",
+                    "name": "id"
+                }
+            });
+
+            let mut path = Path::from(["user".into(), "id".into()]);
+
+            let keep = lens.transform_path(&mut path);
+
+            assert!(keep);
+            assert_eq!(path, Path::from(["id".into()]));
         }
     }
 }
