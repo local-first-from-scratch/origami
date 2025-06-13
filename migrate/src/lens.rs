@@ -345,20 +345,21 @@ impl Lens {
         }
     }
 
-    /// Transform the path of a patch. Returns an indicator of whether the path
-    /// should be kept after this lens: true to keep, false to remove.
-    pub fn transform_path(&self, path: &mut Path) -> bool {
+    /// Transform the path of a patch.
+    #[must_use]
+    pub fn transform_path(&self, path: &mut Path) -> PathMeta {
         match self {
-            Lens::Add(..) => true,
-            Lens::Remove(AddRemove { name, .. }) => path.first().is_none_or(
-                |first| matches!(first, KeyOrIndex::Key(first_name) if first_name != name),
-            ),
+            Lens::Add(..) => PathMeta::Keep,
+            Lens::Remove(AddRemove { name, .. }) => match path.first() {
+                Some(KeyOrIndex::Key(segment)) if segment == name => PathMeta::Remove,
+                _ => PathMeta::Keep,
+            },
             Lens::Rename(Rename { from, to }) => {
                 if matches!(path.first(), Some(KeyOrIndex::Key(segment)) if segment == from) {
                     path[0] = KeyOrIndex::Key(to.clone());
                 }
 
-                true
+                PathMeta::Keep
             }
             Lens::Extract(ExtractEmbed { host, name }) => {
                 match path.get(0) {
@@ -368,23 +369,23 @@ impl Lens {
                                 path[0] = KeyOrIndex::Key(name.clone());
                                 path.remove(1);
 
-                                true
+                                PathMeta::Keep
                             }
                             // If the host matched but the name didn't, we're
                             // extracting out of the object anyway and should
                             // drop other keys.
-                            _ => false,
+                            _ => PathMeta::Remove,
                         }
                     }
-                    _ => true,
+                    _ => PathMeta::Keep,
                 }
             }
-            Lens::Embed(..) => true,
-            Lens::Head(..) => true,
-            Lens::Wrap(..) => true,
-            Lens::In(..) => true,
-            Lens::Map(..) => true,
-            Lens::Convert(..) => true,
+            Lens::Embed(..) => todo!("Lens::Embed"),
+            Lens::Head(..) => todo!("Lens::Head"),
+            Lens::Wrap(..) => todo!("Lens::Wrap"),
+            Lens::In(..) => todo!("Lens::In"),
+            Lens::Map(..) => todo!("Lens::Map"),
+            Lens::Convert(..) => todo!("Lens::Convert"),
         }
     }
 
@@ -425,6 +426,13 @@ pub enum TransformJtdError {
 
     #[error("Got the wrong source type for `transform`. Expected `{0:?}`, got `{1:?}`.")]
     WrongTypeForTransform(Box<Schema>, Box<Schema>),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum PathMeta {
+    Keep,
+    KeepAndAddHost(Path),
+    Remove,
 }
 
 #[cfg(test)]
@@ -1156,6 +1164,12 @@ mod test {
         use super::*;
         use pretty_assertions::assert_eq;
 
+        macro_rules! assert_keep {
+            ($path:expr) => {
+                assert_eq!(PathMeta::Keep, $path);
+            };
+        }
+
         #[test]
         fn add_always_keeps() {
             let lens = lens!({
@@ -1165,9 +1179,7 @@ mod test {
                 }
             });
 
-            let keep = lens.transform_path(&mut Path::new());
-
-            assert!(keep)
+            assert_keep!(lens.transform_path(&mut Path::new()));
         }
 
         #[test]
@@ -1179,9 +1191,7 @@ mod test {
                 }
             });
 
-            let keep = lens.transform_path(&mut Path::new());
-
-            assert!(keep)
+            assert_keep!(lens.transform_path(&mut Path::new()));
         }
 
         #[test]
@@ -1193,9 +1203,8 @@ mod test {
                 }
             });
 
-            let keep = lens.transform_path(&mut Path::from(["name".into()]));
-
-            assert!(!keep)
+            let meta = lens.transform_path(&mut Path::from(["name".into()]));
+            assert_eq!(PathMeta::Remove, meta);
         }
 
         #[test]
@@ -1210,9 +1219,7 @@ mod test {
             let mut path = Path::from(["whatever".into()]);
             let orig = path.clone();
 
-            let keep = lens.transform_path(&mut path);
-
-            assert!(keep);
+            assert_keep!(lens.transform_path(&mut path));
             assert_eq!(path, orig);
         }
 
@@ -1227,9 +1234,7 @@ mod test {
 
             let mut path = Path::from(["old".into()]);
 
-            let keep = lens.transform_path(&mut path);
-
-            assert!(keep);
+            assert_keep!(lens.transform_path(&mut path));
             assert_eq!(path, Path::from(["new".into()]));
         }
 
@@ -1245,9 +1250,7 @@ mod test {
             let mut path = Path::from(["other_host".into(), "id".into()]);
             let orig = path.clone();
 
-            let keep = lens.transform_path(&mut path);
-
-            assert!(keep);
+            assert_keep!(lens.transform_path(&mut path));
             assert_eq!(path, orig);
         }
 
@@ -1260,9 +1263,9 @@ mod test {
                 }
             });
 
-            let keep = lens.transform_path(&mut Path::from(["user".into(), "other_name".into()]));
+            let meta = lens.transform_path(&mut Path::from(["user".into(), "other_name".into()]));
 
-            assert!(!keep);
+            assert_eq!(PathMeta::Remove, meta);
         }
 
         #[test]
@@ -1276,9 +1279,7 @@ mod test {
 
             let mut path = Path::from(["user".into(), "id".into()]);
 
-            let keep = lens.transform_path(&mut path);
-
-            assert!(keep);
+            assert_keep!(lens.transform_path(&mut path));
             assert_eq!(path, Path::from(["id".into()]));
         }
     }
