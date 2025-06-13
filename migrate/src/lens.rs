@@ -348,25 +348,29 @@ impl Lens {
     /// Transform the path of a patch.
     #[must_use]
     pub fn transform_path(&self, path: &mut Path) -> PathMeta {
+        self.transform_path_at_index(path, 0)
+    }
+
+    fn transform_path_at_index(&self, path: &mut Path, index: usize) -> PathMeta {
         match self {
             Lens::Add(..) => PathMeta::Keep,
-            Lens::Remove(AddRemove { name, .. }) => match path.first() {
+            Lens::Remove(AddRemove { name, .. }) => match path.get(index) {
                 Some(KeyOrIndex::Key(segment)) if segment == name => PathMeta::Remove,
                 _ => PathMeta::Keep,
             },
             Lens::Rename(Rename { from, to }) => {
-                if matches!(path.first(), Some(KeyOrIndex::Key(segment)) if segment == from) {
-                    path[0] = KeyOrIndex::Key(to.clone());
+                if matches!(path.get(index), Some(KeyOrIndex::Key(segment)) if segment == from) {
+                    path[index] = KeyOrIndex::Key(to.clone());
                 }
 
                 PathMeta::Keep
             }
             Lens::Extract(ExtractEmbed { host, name }) => {
-                match path.get(0) {
+                match path.get(index) {
                     Some(KeyOrIndex::Key(host_segment)) if host_segment == host => {
-                        match path.get(1) {
+                        match path.get(index + 1) {
                             Some(KeyOrIndex::Key(name_segment)) if name_segment == name => {
-                                path.remove(1);
+                                path.remove(index + 1);
 
                                 PathMeta::Keep
                             }
@@ -380,11 +384,11 @@ impl Lens {
                 }
             }
             Lens::Embed(ExtractEmbed { host, name }) => {
-                if matches!(path.get(0), Some(KeyOrIndex::Key(host_segment)) if host_segment == host)
+                if matches!(path.get(index), Some(KeyOrIndex::Key(host_segment)) if host_segment == host)
                 {
-                    path.insert(1, name.into());
+                    path.insert(index + 1, name.into());
 
-                    PathMeta::KeepAndAddHost(Path::from([path[0].clone()]))
+                    PathMeta::KeepAndAddHost(Path::from(&path[0..=index]))
                 } else {
                     PathMeta::Keep
                 }
