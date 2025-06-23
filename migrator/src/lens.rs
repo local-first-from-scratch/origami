@@ -26,8 +26,8 @@ impl Lens {
 pub struct AddRemoveField {
     name: String,
     #[serde(rename = "type")]
-    _type: value::Type,
-    default: Option<value::Value>,
+    type_: value::Type,
     #[serde(default)]
     nullable: bool,
+    default: Option<value::Value>,
 }
