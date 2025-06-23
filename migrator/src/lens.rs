@@ -1,6 +1,7 @@
+use crate::type_::{SerdeType, Type};
 use crate::value;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Debug, Clone, serde::Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Lens {
     Add(AddRemoveField),
@@ -23,11 +24,98 @@ impl Lens {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct AddRemoveField {
+pub struct SerdeAddRemoveField {
     name: String,
     #[serde(rename = "type")]
-    type_: value::Type,
+    type_: SerdeType,
     #[serde(default)]
     nullable: bool,
-    default: Option<value::Value>,
+    #[serde(default = "value::Value::null")]
+    default: value::Value,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AddRemoveField {
+    name: String,
+    type_: Type,
+    default: value::Value,
+}
+
+impl<'de> serde::Deserialize<'de> for AddRemoveField {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let SerdeAddRemoveField {
+            name,
+            type_,
+            nullable,
+            default,
+        } = SerdeAddRemoveField::deserialize(deserializer)?;
+
+        let final_type = Type::from_serde(type_, nullable);
+
+        final_type
+            .validate(&default)
+            .map_err(|err| serde::de::Error::custom(err))?;
+
+        Ok(Self {
+            name,
+            type_: final_type,
+            default,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::type_::SerdeType;
+    use crate::value::Value;
+    use serde_json::json;
+
+    #[test]
+    fn addremovefield_deserializes_successfully() {
+        let deserialized = serde_json::from_value::<AddRemoveField>(json!({
+            "name": "test_field",
+            "type": "string",
+            "nullable": false,
+            "default": "default_value"
+        }))
+        .unwrap();
+
+        assert_eq!(
+            AddRemoveField {
+                name: "test_field".to_string(),
+                type_: Type::from_serde(SerdeType::String, false),
+                default: "default_value".into(),
+            },
+            deserialized
+        );
+    }
+
+    #[test]
+    fn addremovefield_checks_default() {
+        let err = serde_json::from_value::<AddRemoveField>(json!({
+            "name": "test_field",
+            "type": "string",
+            "nullable": false,
+            "default": null,
+        }))
+        .unwrap_err();
+
+        assert_eq!("Invalid value for type String: Null", err.to_string(),);
+    }
+
+    #[test]
+    fn addremovefield_sets_null_as_default() {
+        let deserialized = serde_json::from_value::<AddRemoveField>(json!({
+            "name": "test_field",
+            "type": "string",
+            "nullable": true,
+        }))
+        .unwrap();
+
+        assert_eq!(Value::Null, deserialized.default);
+    }
 }

@@ -1,12 +1,3 @@
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum Type {
-    String,
-    Int,
-    Float,
-    Bool,
-}
-
 #[derive(Debug, Clone, serde::Serialize, PartialEq)]
 pub enum Value {
     String(String),
@@ -14,6 +5,12 @@ pub enum Value {
     Float(f64),
     Bool(bool),
     Null,
+}
+
+impl Value {
+    pub fn null() -> Value {
+        Value::Null
+    }
 }
 
 impl<'de> serde::Deserialize<'de> for Value {
@@ -123,5 +120,11 @@ impl From<i64> for Value {
 impl From<String> for Value {
     fn from(v: String) -> Self {
         Self::String(v)
+    }
+}
+
+impl From<&str> for Value {
+    fn from(v: &str) -> Self {
+        Self::String(v.to_string())
     }
 }

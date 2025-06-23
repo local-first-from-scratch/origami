@@ -112,6 +112,7 @@ mod tests {
         let lens_a = lens!({"add": {
             "name": "a",
             "type": "string",
+            "nullable": true,
         }});
         let migration_a = Migration {
             id: id_a.to_string(),
