@@ -30,7 +30,14 @@ impl App {
     fn run(&self) -> Result<(), Error> {
         match &self.command {
             Command::New { id, base } => {
-                self.ensure_migrations_dir()?;
+                if !self.dir.exists() {
+                    std::fs::create_dir_all(&self.dir).wrap_err_with(|| {
+                        format!(
+                            "Could not create migrations directory at {}",
+                            self.dir.display()
+                        )
+                    })?;
+                }
 
                 let blank = Migration {
                     id: id.clone(),
@@ -52,19 +59,6 @@ impl App {
             }
             Command::Schema { .. } => bail!("todo"),
         }
-    }
-
-    fn ensure_migrations_dir(&self) -> Result<(), Error> {
-        if !self.dir.exists() {
-            std::fs::create_dir_all(&self.dir).wrap_err_with(|| {
-                format!(
-                    "Could not create migrations directory at {}",
-                    self.dir.display()
-                )
-            })?;
-        }
-
-        Ok(())
     }
 }
 
