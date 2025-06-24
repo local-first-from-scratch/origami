@@ -57,7 +57,7 @@ impl<'de> serde::Deserialize<'de> for AddRemoveField {
 
         final_type
             .validate(&default)
-            .map_err(|err| serde::de::Error::custom(err))?;
+            .map_err(serde::de::Error::custom)?;
 
         Ok(Self {
             name,
