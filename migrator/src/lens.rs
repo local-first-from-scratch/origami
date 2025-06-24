@@ -76,7 +76,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn addremovefield_deserializes_successfully() {
+    fn conversion_deserializes_successfully() {
         let deserialized = serde_json::from_value::<AddRemoveField>(json!({
             "name": "test_field",
             "type": "string",
@@ -96,7 +96,7 @@ mod tests {
     }
 
     #[test]
-    fn addremovefield_checks_default() {
+    fn conversion_checks_default() {
         let err = serde_json::from_value::<AddRemoveField>(json!({
             "name": "test_field",
             "type": "string",
@@ -109,7 +109,7 @@ mod tests {
     }
 
     #[test]
-    fn addremovefield_sets_null_as_default() {
+    fn conversion_sets_null_as_default() {
         let deserialized = serde_json::from_value::<AddRemoveField>(json!({
             "name": "test_field",
             "type": "string",
