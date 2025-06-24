@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::value::Value;
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -34,7 +36,12 @@ impl Type {
             (Type::Float, Value::Float(_)) => Ok(()),
             (Type::Bool, Value::Bool(_)) => Ok(()),
             (Type::Nullable(_), Value::Null) => Ok(()),
-            (Type::Nullable(inner), _) => inner.validate(value),
+            (Type::Nullable(inner), _) => inner.validate(value).map_err(|err| match err {
+                ValidationError::InvalidValue { got, .. } => ValidationError::InvalidValue {
+                    expected: self.clone(),
+                    got,
+                },
+            }),
             _ => Err(ValidationError::InvalidValue {
                 expected: self.clone(),
                 got: value.clone(),
@@ -54,9 +61,21 @@ impl From<SerdeType> for Type {
     }
 }
 
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::String => write!(f, "string"),
+            Type::Int => write!(f, "int"),
+            Type::Float => write!(f, "float"),
+            Type::Bool => write!(f, "bool"),
+            Type::Nullable(inner) => write!(f, "nullable {}", inner),
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ValidationError {
-    #[error("Invalid value for type {expected:?}: {got:?}")]
+    #[error("Invalid value for type {expected}: {got}")]
     InvalidValue { expected: Type, got: Value },
 }
 

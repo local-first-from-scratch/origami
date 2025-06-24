@@ -100,12 +100,12 @@ mod tests {
         let err = serde_json::from_value::<AddRemoveField>(json!({
             "name": "test_field",
             "type": "string",
-            "nullable": false,
+            "nullable": true,
             "default": 1,
         }))
         .unwrap_err();
 
-        assert_eq!("Invalid value for type String: Int(1)", err.to_string(),);
+        assert_eq!("Invalid value for type nullable string: 1", err.to_string(),);
     }
 
     #[test]

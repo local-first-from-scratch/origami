@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[derive(Debug, Clone, serde::Serialize, PartialEq)]
 pub enum Value {
     String(String),
@@ -5,6 +7,18 @@ pub enum Value {
     Float(f64),
     Bool(bool),
     Null,
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Value::String(s) => write!(f, "{}", s),
+            Value::Int(i) => write!(f, "{}", i),
+            Value::Float(n) => write!(f, "{}", n),
+            Value::Bool(b) => write!(f, "{}", b),
+            Value::Null => write!(f, "null"),
+        }
+    }
 }
 
 impl Value {
