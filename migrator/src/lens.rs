@@ -101,11 +101,11 @@ mod tests {
             "name": "test_field",
             "type": "string",
             "nullable": false,
-            "default": null,
+            "default": 1,
         }))
         .unwrap_err();
 
-        assert_eq!("Invalid value for type String: Null", err.to_string(),);
+        assert_eq!("Invalid value for type String: Int(1)", err.to_string(),);
     }
 
     #[test]
