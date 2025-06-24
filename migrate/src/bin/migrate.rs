@@ -1,6 +1,8 @@
 use clap::Parser;
-use color_eyre::eyre::{Context, Error, bail};
-use migrator::migration::Migration;
+use color_eyre::eyre::{Context, ContextCompat, Error, bail};
+use migrator::{migration::Migration, migrator::Migrator};
+use std::collections::BTreeMap;
+use std::fs::File;
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
@@ -57,7 +59,47 @@ impl App {
 
                 Ok(())
             }
-            Command::Schema { .. } => bail!("todo"),
+            Command::Schema { id } => {
+                let mut migrator = Migrator::new();
+                for entry in self
+                    .dir
+                    .read_dir()
+                    .wrap_err("could not read migrations directory")?
+                {
+                    let entry = entry.wrap_err("could not read migration directory entry")?;
+
+                    let file =
+                        File::open(entry.path()).wrap_err("could not read migration file")?;
+
+                    let migration = serde_json::from_reader(file)
+                        .wrap_err("could not deserialize migration")?;
+
+                    migrator.add_migration(migration);
+                }
+
+                let mut schema = jtd::Schema::Properties {
+                    definitions: BTreeMap::new(),
+                    metadata: BTreeMap::new(),
+                    nullable: false,
+                    properties: BTreeMap::new(),
+                    optional_properties: BTreeMap::new(),
+                    properties_is_present: true,
+                    additional_properties: false,
+                };
+
+                for lens in migrator
+                    .migration_path(None, id)
+                    .wrap_err("could not find path to migration")?
+                {
+                    lens.transform_jtd(&mut schema)
+                        .wrap_err("could not apply operation")?;
+                }
+
+                serde_json::to_writer_pretty(std::io::stdout(), &schema.into_serde_schema())
+                    .wrap_err("could not serialize schema")?;
+
+                Ok(())
+            }
         }
     }
 }
