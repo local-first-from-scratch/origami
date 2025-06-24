@@ -1,5 +1,5 @@
 use clap::Parser;
-use color_eyre::eyre::{Context, ContextCompat, Error, bail};
+use color_eyre::eyre::{Context, ContextCompat, Error};
 use migrator::{migration::Migration, migrator::Migrator};
 use std::collections::BTreeMap;
 use std::fs::File;
