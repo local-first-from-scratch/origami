@@ -1,4 +1,6 @@
-use std::fmt::Display;
+use std::{collections::BTreeMap, fmt::Display};
+
+use jtd::Schema;
 
 use crate::value::Value;
 
@@ -71,6 +73,37 @@ impl From<SerdeType> for Type {
             SerdeType::Int => Self::Int,
             SerdeType::Float => Self::Float,
             SerdeType::Bool => Self::Bool,
+        }
+    }
+}
+
+impl From<&Type> for jtd::Type {
+    fn from(type_: &Type) -> Self {
+        match type_ {
+            Type::String => jtd::Type::String,
+            Type::Int => jtd::Type::Int32,
+            Type::Float => jtd::Type::Float64,
+            Type::Bool => jtd::Type::Boolean,
+            Type::Nullable(inner) => inner.as_ref().into(),
+        }
+    }
+}
+
+impl From<&Type> for Schema {
+    fn from(type_: &Type) -> Self {
+        match type_ {
+            Type::String | Type::Int | Type::Float | Type::Bool => Schema::Type {
+                definitions: BTreeMap::new(),
+                metadata: BTreeMap::new(),
+                nullable: false,
+                type_: type_.into(),
+            },
+            Type::Nullable(inner) => Schema::Type {
+                definitions: BTreeMap::new(),
+                metadata: BTreeMap::new(),
+                nullable: true,
+                type_: inner.as_ref().into(),
+            },
         }
     }
 }
