@@ -1,7 +1,7 @@
 use crate::type_::{SerdeType, Type};
 use crate::value;
 
-#[derive(Debug, Clone, serde::Deserialize, PartialEq)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Lens {
     Add(AddRemoveField),
@@ -64,6 +64,22 @@ impl<'de> serde::Deserialize<'de> for AddRemoveField {
             type_: final_type,
             default,
         })
+    }
+}
+
+impl serde::Serialize for AddRemoveField {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let converted = SerdeAddRemoveField {
+            name: self.name.clone(),
+            type_: self.type_.to_serde(),
+            nullable: self.type_.is_nullable(),
+            default: self.default.clone(),
+        };
+
+        converted.serialize(serializer)
     }
 }
 

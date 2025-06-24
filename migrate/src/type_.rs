@@ -29,6 +29,20 @@ impl Type {
         }
     }
 
+    pub fn to_serde(&self) -> SerdeType {
+        match self {
+            Type::String => SerdeType::String,
+            Type::Int => SerdeType::Int,
+            Type::Float => SerdeType::Float,
+            Type::Bool => SerdeType::Bool,
+            Type::Nullable(inner) => inner.to_serde(),
+        }
+    }
+
+    pub fn is_nullable(&self) -> bool {
+        matches!(self, Type::Nullable(_))
+    }
+
     pub fn validate(&self, value: &Value) -> Result<(), ValidationError> {
         match (self, value) {
             (Type::String, Value::String(_)) => Ok(()),
