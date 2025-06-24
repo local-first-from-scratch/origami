@@ -72,6 +72,7 @@ mod tests {
     use super::*;
     use crate::type_::SerdeType;
     use crate::value::Value;
+    use pretty_assertions::assert_eq;
     use serde_json::json;
 
     #[test]
