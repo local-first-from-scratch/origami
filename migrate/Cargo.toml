@@ -14,3 +14,4 @@ thiserror = "2.0.12"
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"
+trycmd = "0.15.9"

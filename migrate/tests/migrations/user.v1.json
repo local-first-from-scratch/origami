@@ -1,0 +1,13 @@
+{
+	"id": "user.v1",
+	"base": null,
+	"ops": [
+		{
+			"add": {
+				"name": "handle",
+				"type": "string",
+				"nullable": true
+			}
+		}
+	]
+}
