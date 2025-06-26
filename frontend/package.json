@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vue-tsc --noEmit && rsbuild build",
+    "build": "rsbuild build && vue-tsc --noEmit",
     "check": "biome check --write",
     "check:ci": "biome ci --error-on-warnings",
     "dev": "rsbuild dev --open",
