@@ -159,4 +159,4 @@ jobs:
 
       - name: Run frontend checks
         working-directory: frontend
-        run: bun run check
+        run: bun run check:ci
