@@ -132,7 +132,7 @@ jobs:
         run: bun run build
 
   frontend-check:
-    name: Frontend Code Check
+    name: Frontend Check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
