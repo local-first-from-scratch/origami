@@ -139,7 +139,7 @@ mod tests {
                 .is_ok()
         );
         assert!(string_type.validate(&Value::Int(42)).is_err());
-        assert!(string_type.validate(&Value::Float(3.14)).is_err());
+        assert!(string_type.validate(&Value::Float(1.23)).is_err());
         assert!(string_type.validate(&Value::Bool(true)).is_err());
         assert!(string_type.validate(&Value::Null).is_err());
     }
@@ -153,7 +153,7 @@ mod tests {
                 .validate(&Value::String("hello".to_string()))
                 .is_err()
         );
-        assert!(int_type.validate(&Value::Float(3.14)).is_err());
+        assert!(int_type.validate(&Value::Float(1.23)).is_err());
         assert!(int_type.validate(&Value::Bool(true)).is_err());
         assert!(int_type.validate(&Value::Null).is_err());
     }
@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn validate_float() {
         let float_type = Type::Float;
-        assert!(float_type.validate(&Value::Float(3.14)).is_ok());
+        assert!(float_type.validate(&Value::Float(1.23)).is_ok());
         assert!(
             float_type
                 .validate(&Value::String("hello".to_string()))
@@ -183,7 +183,7 @@ mod tests {
                 .is_err()
         );
         assert!(bool_type.validate(&Value::Int(42)).is_err());
-        assert!(bool_type.validate(&Value::Float(3.14)).is_err());
+        assert!(bool_type.validate(&Value::Float(1.23)).is_err());
         assert!(bool_type.validate(&Value::Null).is_err());
     }
 
@@ -209,12 +209,12 @@ mod tests {
 
         let nullable_float = Type::Nullable(Box::new(Type::Float));
         assert!(nullable_float.validate(&Value::Null).is_ok());
-        assert!(nullable_float.validate(&Value::Float(3.14)).is_ok());
+        assert!(nullable_float.validate(&Value::Float(1.23)).is_ok());
         assert!(nullable_float.validate(&Value::Bool(true)).is_err());
 
         let nullable_bool = Type::Nullable(Box::new(Type::Bool));
         assert!(nullable_bool.validate(&Value::Null).is_ok());
         assert!(nullable_bool.validate(&Value::Bool(true)).is_ok());
-        assert!(nullable_bool.validate(&Value::Float(3.14)).is_err());
+        assert!(nullable_bool.validate(&Value::Float(1.23)).is_err());
     }
 }
