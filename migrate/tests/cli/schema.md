@@ -1,4 +1,4 @@
-You should be able to see the right schema for any migration. That way we get backward and fowards compatibility.
+You should be able to see the right schema for any migration. That way we get backward and forwards compatibility.
 
 ```console
 $ migrate schema user.v1 --dir tests/migrations
