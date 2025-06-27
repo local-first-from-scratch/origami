@@ -1,7 +1,7 @@
 You should be able to see the right schema for any migration. That way we get backward and forwards compatibility.
 
 ```console
-$ migrate schema user.v1 --dir tests/migrations
+$ migrate schema user.v1
 {
   "properties": {
     "handle": {
@@ -13,7 +13,7 @@ $ migrate schema user.v1 --dir tests/migrations
 ```
 
 ```console
-$ migrate schema user.v2 --dir tests/migrations
+$ migrate schema user.v2
 {
   "properties": {
     "username": {
@@ -25,7 +25,7 @@ $ migrate schema user.v2 --dir tests/migrations
 ```
 
 ```console
-$ migrate schema user.v3 --dir tests/migrations
+$ migrate schema user.v3
 {
   "properties": {}
 }

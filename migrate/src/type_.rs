@@ -115,7 +115,7 @@ impl Display for Type {
             Type::Int => write!(f, "int"),
             Type::Float => write!(f, "float"),
             Type::Bool => write!(f, "bool"),
-            Type::Nullable(inner) => write!(f, "nullable {}", inner),
+            Type::Nullable(inner) => write!(f, "nullable {inner}"),
         }
     }
 }

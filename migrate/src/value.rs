@@ -12,10 +12,10 @@ pub enum Value {
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Value::String(s) => write!(f, "{}", s),
-            Value::Int(i) => write!(f, "{}", i),
-            Value::Float(n) => write!(f, "{}", n),
-            Value::Bool(b) => write!(f, "{}", b),
+            Value::String(s) => write!(f, "{s}"),
+            Value::Int(i) => write!(f, "{i}"),
+            Value::Float(n) => write!(f, "{n}"),
+            Value::Bool(b) => write!(f, "{b}"),
             Value::Null => write!(f, "null"),
         }
     }
@@ -66,7 +66,7 @@ impl<'de> serde::de::Visitor<'de> for ValueVisitor {
         if v <= i64::MAX as u64 {
             Ok(Value::Int(v as i64))
         } else {
-            Err(E::custom(format!("u64 value {} is too large for i64", v)))
+            Err(E::custom(format!("u64 value {v} is too large for i64")))
         }
     }
 
