@@ -1,7 +1,8 @@
-use jtd::Schema;
-
 use crate::type_::{SerdeType, Type};
-use crate::value;
+use crate::{Value, value};
+use jtd::Schema;
+use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -24,12 +25,38 @@ impl Lens {
         }
     }
 
-    pub fn transform_jtd(&self, jtd: &mut Schema) -> Result<(), TransformJtdError> {
+    pub fn transform_defaults(
+        &self,
+        defaults: &mut BTreeMap<String, Value>,
+    ) -> Result<(), TransformError> {
+        match self {
+            Lens::Add(lens) => match defaults.entry(lens.name.clone()) {
+                Entry::Vacant(vacant_entry) => {
+                    vacant_entry.insert(lens.default.clone());
+                    Ok(())
+                }
+                Entry::Occupied(_) => Err(TransformError::ConflictingFieldOnAdd(lens.name.clone())),
+            },
+            Lens::Remove(lens) => match defaults.remove(&lens.name) {
+                Some(_) => Ok(()),
+                None => Err(TransformError::MissingFieldOnRemove(lens.name.clone())),
+            },
+            Lens::Rename { from, to } => match defaults.remove(from) {
+                Some(value) => {
+                    defaults.insert(to.clone(), value);
+                    Ok(())
+                }
+                None => Err(TransformError::MissingFieldOnRename(from.clone())),
+            },
+        }
+    }
+
+    pub fn transform_jtd(&self, jtd: &mut Schema) -> Result<(), TransformError> {
         match jtd {
             Schema::Properties { properties, .. } => match self {
                 Lens::Add(lens) => {
                     if properties.contains_key(&lens.name) {
-                        Err(TransformJtdError::ConflictingFieldOnAdd(lens.name.clone()))
+                        Err(TransformError::ConflictingFieldOnAdd(lens.name.clone()))
                     } else {
                         properties.insert(lens.name.clone(), (&lens.type_).into());
                         Ok(())
@@ -40,7 +67,7 @@ impl Lens {
                         properties.remove(&lens.name);
                         Ok(())
                     } else {
-                        Err(TransformJtdError::MissingFieldOnRemove(lens.name.clone()))
+                        Err(TransformError::MissingFieldOnRemove(lens.name.clone()))
                     }
                 }
                 Lens::Rename { from, to } => match properties.remove(from) {
@@ -48,17 +75,17 @@ impl Lens {
                         properties.insert(to.clone(), value);
                         Ok(())
                     }
-                    None => Err(TransformJtdError::MissingFieldOnRename(from.clone())),
+                    None => Err(TransformError::MissingFieldOnRename(from.clone())),
                 },
             },
 
-            _ => Err(TransformJtdError::UnsupportedSchemaType),
+            _ => Err(TransformError::UnsupportedSchemaType),
         }
     }
 }
 
 #[derive(Debug, thiserror::Error, PartialEq)]
-pub enum TransformJtdError {
+pub enum TransformError {
     #[error("Unsupported schema type. We can only transform `properties` schemas.")]
     UnsupportedSchemaType,
     #[error("Tried to add `{0}`, but it already exists.")]
@@ -136,6 +163,109 @@ mod tests {
     use crate::value::Value;
     use serde_json::json;
 
+    mod transform_defaults {
+        use super::*;
+        use pretty_assertions::assert_eq;
+
+        #[test]
+        fn add_field_success() {
+            let mut defaults = BTreeMap::new();
+
+            let lens = Lens::Add(AddRemoveField {
+                name: "test".into(),
+                type_: Type::String,
+                default: "default_value".into(),
+            });
+
+            lens.transform_defaults(&mut defaults).unwrap();
+
+            let mut expected = BTreeMap::new();
+            expected.insert("test".to_string(), "default_value".into());
+            assert_eq!(defaults, expected);
+        }
+
+        #[test]
+        fn add_field_conflict() {
+            let mut defaults = BTreeMap::new();
+            defaults.insert("test".to_string(), "existing_value".into());
+
+            let lens = Lens::Add(AddRemoveField {
+                name: "test".into(),
+                type_: Type::String,
+                default: "default_value".into(),
+            });
+
+            assert_eq!(
+                lens.transform_defaults(&mut defaults).unwrap_err(),
+                TransformError::ConflictingFieldOnAdd("test".to_string())
+            );
+        }
+
+        #[test]
+        fn remove_field_success() {
+            let mut defaults = BTreeMap::new();
+            defaults.insert("test".to_string(), "existing_value".into());
+
+            let lens = Lens::Remove(AddRemoveField {
+                name: "test".into(),
+                type_: Type::String,
+                default: "unused".into(),
+            });
+
+            lens.transform_defaults(&mut defaults).unwrap();
+
+            assert_eq!(defaults, BTreeMap::new());
+        }
+
+        #[test]
+        fn remove_field_missing() {
+            let mut defaults = BTreeMap::new();
+
+            let lens = Lens::Remove(AddRemoveField {
+                name: "test".into(),
+                type_: Type::String,
+                default: "unused".into(),
+            });
+
+            assert_eq!(
+                lens.transform_defaults(&mut defaults).unwrap_err(),
+                TransformError::MissingFieldOnRemove("test".to_string())
+            );
+        }
+
+        #[test]
+        fn rename_field_success() {
+            let mut defaults = BTreeMap::new();
+            defaults.insert("test".to_string(), "value".into());
+
+            let lens = Lens::Rename {
+                from: "test".into(),
+                to: "new".into(),
+            };
+
+            lens.transform_defaults(&mut defaults).unwrap();
+
+            let mut expected = BTreeMap::new();
+            expected.insert("new".to_string(), "value".into());
+            assert_eq!(defaults, expected);
+        }
+
+        #[test]
+        fn rename_field_missing() {
+            let mut defaults = BTreeMap::new();
+
+            let lens = Lens::Rename {
+                from: "test".into(),
+                to: "new".into(),
+            };
+
+            assert_eq!(
+                lens.transform_defaults(&mut defaults).unwrap_err(),
+                TransformError::MissingFieldOnRename("test".to_string())
+            );
+        }
+    }
+
     mod transform_jtd {
         use super::*;
         use pretty_assertions::assert_eq;
@@ -176,7 +306,7 @@ mod tests {
 
             assert_eq!(
                 lens.transform_jtd(&mut base).unwrap_err(),
-                TransformJtdError::ConflictingFieldOnAdd("test".to_string())
+                TransformError::ConflictingFieldOnAdd("test".to_string())
             );
         }
 
@@ -207,7 +337,7 @@ mod tests {
 
             assert_eq!(
                 lens.transform_jtd(&mut base).unwrap_err(),
-                TransformJtdError::MissingFieldOnRemove("test".to_string())
+                TransformError::MissingFieldOnRemove("test".to_string())
             );
         }
 
@@ -236,7 +366,7 @@ mod tests {
 
             assert_eq!(
                 lens.transform_jtd(&mut base).unwrap_err(),
-                TransformJtdError::MissingFieldOnRename("test".to_string())
+                TransformError::MissingFieldOnRename("test".to_string())
             );
         }
     }
