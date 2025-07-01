@@ -1,4 +1,4 @@
-use crate::storage::{IDBError, IDBStorage};
+use crate::idb::{IDBError, IDBStorage};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]

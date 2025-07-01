@@ -1,4 +1,3 @@
-use super::Storage;
 use crate::op::{Field, Row};
 use idb::{
     CursorDirection, Database, KeyPath, Query, TransactionMode,
@@ -38,30 +37,8 @@ impl IDBStorage {
 
         Ok(Self { database })
     }
-}
 
-#[derive(Debug, thiserror::Error)]
-pub enum IDBError {
-    #[error("IndexedDB error: {0}")]
-    IDBError(#[from] idb::Error),
-
-    #[error("Serde error: {0}")]
-    Serde(#[from] serde_wasm_bindgen::Error),
-
-    #[error("Missing cursor while reading")]
-    MissingCursor,
-}
-
-impl Into<JsValue> for IDBError {
-    fn into(self) -> JsValue {
-        JsValue::from_str(&self.to_string())
-    }
-}
-
-impl Storage for IDBStorage {
-    type Error = IDBError;
-
-    async fn get_rows(&self, table: &str) -> Result<Vec<Row>, Self::Error> {
+    async fn get_rows(&self, table: &str) -> Result<Vec<Row>, IDBError> {
         let tx = self
             .database
             .transaction(&["row"], TransactionMode::ReadOnly)?;
@@ -82,7 +59,25 @@ impl Storage for IDBStorage {
         Ok(out)
     }
 
-    async fn get_fields(&self, rows: Vec<uuid::Uuid>) -> Result<Vec<Field>, Self::Error> {
+    async fn get_fields(&self, rows: Vec<uuid::Uuid>) -> Result<Vec<Field>, IDBError> {
         todo!()
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum IDBError {
+    #[error("IndexedDB error: {0}")]
+    IDBError(#[from] idb::Error),
+
+    #[error("Serde error: {0}")]
+    Serde(#[from] serde_wasm_bindgen::Error),
+
+    #[error("Missing cursor while reading")]
+    MissingCursor,
+}
+
+impl Into<JsValue> for IDBError {
+    fn into(self) -> JsValue {
+        JsValue::from_str(&self.to_string())
     }
 }
