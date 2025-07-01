@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { greet } from 'store';
+import { store, greet } from 'store';
+
+store().then((s) => console.log(s));
 </script>
 
 <template>

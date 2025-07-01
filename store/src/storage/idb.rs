@@ -1,21 +1,17 @@
 use super::Storage;
+use crate::op::{Field, Row};
 use idb::{
-    Database, KeyPath,
+    CursorDirection, Database, KeyPath, Query, TransactionMode,
     builder::{DatabaseBuilder, IndexBuilder, ObjectStoreBuilder},
 };
+use wasm_bindgen::JsValue;
 
-struct IDBStorage {
+pub struct IDBStorage {
     database: Database,
 }
 
-#[derive(Debug, thiserror::Error)]
-enum InitError {
-    #[error("IDB error: {0}")]
-    IDB(#[from] idb::Error),
-}
-
 impl IDBStorage {
-    async fn init() -> Result<Self, InitError> {
+    pub async fn init() -> Result<Self, idb::Error> {
         let database = DatabaseBuilder::new("ops")
             .add_object_store(
                 ObjectStoreBuilder::new("row")
@@ -28,21 +24,13 @@ impl IDBStorage {
                     ),
             )
             .add_object_store(
-                ObjectStoreBuilder::new("fieldSet")
+                ObjectStoreBuilder::new("field")
                     .auto_increment(false)
                     .key_path(Some(KeyPath::new_array(["table", "row_id", "field_name"])))
                     .add_index(
-                        IndexBuilder::new("by_table".to_string(), KeyPath::new_single("table"))
+                        IndexBuilder::new("by_row_id".to_string(), KeyPath::new_single("row_id"))
                             .unique(false)
                             .multi_entry(false),
-                    )
-                    .add_index(
-                        IndexBuilder::new(
-                            "by_row".to_string(),
-                            KeyPath::new_array(["table", "row_id"]),
-                        )
-                        .unique(false)
-                        .multi_entry(false),
                     ),
             )
             .build()
@@ -52,4 +40,49 @@ impl IDBStorage {
     }
 }
 
-impl Storage for IDBStorage {}
+#[derive(Debug, thiserror::Error)]
+pub enum IDBError {
+    #[error("IndexedDB error: {0}")]
+    IDBError(#[from] idb::Error),
+
+    #[error("Serde error: {0}")]
+    Serde(#[from] serde_wasm_bindgen::Error),
+
+    #[error("Missing cursor while reading")]
+    MissingCursor,
+}
+
+impl Into<JsValue> for IDBError {
+    fn into(self) -> JsValue {
+        JsValue::from_str(&self.to_string())
+    }
+}
+
+impl Storage for IDBStorage {
+    type Error = IDBError;
+
+    async fn get_rows(&self, table: &str) -> Result<Vec<Row>, Self::Error> {
+        let tx = self
+            .database
+            .transaction(&["row"], TransactionMode::ReadOnly)?;
+
+        let row_store = tx.object_store("row")?;
+        let by_table = row_store.index("by_table")?;
+
+        let cursor = by_table
+            .open_cursor(Some(Query::Key(table.into())), Some(CursorDirection::Next))?
+            .await?
+            .ok_or(IDBError::MissingCursor)?;
+
+        let mut out = Vec::new();
+        while let Some(raw_row) = cursor.next(None)?.await? {
+            out.push(serde_wasm_bindgen::from_value(raw_row.value()?)?);
+        }
+
+        Ok(out)
+    }
+
+    async fn get_fields(&self, rows: Vec<uuid::Uuid>) -> Result<Vec<Field>, Self::Error> {
+        todo!()
+    }
+}
