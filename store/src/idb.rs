@@ -1,4 +1,4 @@
-use crate::op::{Field, Row};
+use crate::op::Row;
 use idb::{
     CursorDirection, Database, KeyPath, Query, TransactionMode,
     builder::{DatabaseBuilder, IndexBuilder, ObjectStoreBuilder},
@@ -72,15 +72,15 @@ impl IDBStorage {
         Ok(out)
     }
 
-    pub async fn get_fields(&self, rows: Vec<uuid::Uuid>) -> Result<Vec<Field>, IDBError> {
-        todo!()
-    }
+    // pub async fn get_fields(&self, rows: Vec<uuid::Uuid>) -> Result<Vec<Field>, IDBError> {
+    //     todo!()
+    // }
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum IDBError {
     #[error("IndexedDB error: {0}")]
-    IDB(#[from] idb::Error),
+    Idb(#[from] idb::Error),
 
     #[error("Serde error: {0}")]
     Serde(#[from] serde_wasm_bindgen::Error),

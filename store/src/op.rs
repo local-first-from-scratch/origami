@@ -1,5 +1,5 @@
 use crate::timestamp::Timestamp;
-use migrate::Value;
+// use migrate::Value;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -11,11 +11,11 @@ pub struct Row {
     pub removed: Option<Timestamp>,
 }
 
-pub struct Field {
-    pub table: String,
-    pub row_id: Uuid,
-    pub field_name: String,
-    pub timestamp: Timestamp,
-    pub schema: String,
-    pub value: Value,
-}
+// pub struct Field {
+//     pub table: String,
+//     pub row_id: Uuid,
+//     pub field_name: String,
+//     pub timestamp: Timestamp,
+//     pub schema: String,
+//     pub value: Value,
+// }
