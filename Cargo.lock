@@ -963,7 +963,6 @@ name = "store"
 version = "0.1.0"
 dependencies = [
  "idb",
- "migrate",
  "pretty_assertions",
  "proptest",
  "proptest-derive",
