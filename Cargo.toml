@@ -1,3 +1,11 @@
 [workspace]
 members = ["migrate", "store"]
 resolver = "3"
+
+[profile.release]
+lto = true
+
+[profile.release.package.store]
+# Tell `rustc` to optimize for small code size.
+opt-level = "z"
+codegen-units = 1
