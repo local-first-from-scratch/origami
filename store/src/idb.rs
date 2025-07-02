@@ -38,7 +38,20 @@ impl IDBStorage {
         Ok(Self { database })
     }
 
-    async fn get_rows(&self, table: &str) -> Result<Vec<Row>, IDBError> {
+    pub async fn new_row(&self, row: Row) -> Result<(), IDBError> {
+        let tx = self
+            .database
+            .transaction(&["row"], TransactionMode::ReadWrite)?;
+
+        let row_store = tx.object_store("row")?;
+        row_store.add(&serde_wasm_bindgen::to_value(&row)?, None)?;
+
+        tx.await?;
+
+        Ok(())
+    }
+
+    pub async fn get_rows(&self, table: &str) -> Result<Vec<Row>, IDBError> {
         let tx = self
             .database
             .transaction(&["row"], TransactionMode::ReadOnly)?;
@@ -59,7 +72,7 @@ impl IDBStorage {
         Ok(out)
     }
 
-    async fn get_fields(&self, rows: Vec<uuid::Uuid>) -> Result<Vec<Field>, IDBError> {
+    pub async fn get_fields(&self, rows: Vec<uuid::Uuid>) -> Result<Vec<Field>, IDBError> {
         todo!()
     }
 }

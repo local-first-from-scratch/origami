@@ -1,5 +1,9 @@
 use crate::idb::{IDBError, IDBStorage};
+use crate::op::Row;
+use crate::timestamp::Timestamp;
+use uuid::Uuid;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::js_sys::JsString;
 
 #[wasm_bindgen]
 pub struct Store {
@@ -23,4 +27,22 @@ impl Store {
 }
 
 #[wasm_bindgen]
-impl Store {}
+impl Store {
+    pub async fn insert_test(&self) -> Result<(), IDBError> {
+        self.storage
+            .new_row(Row {
+                table: "test".into(),
+                id: Uuid::now_v7(),
+                added: Timestamp::new(0, Uuid::nil()),
+                removed: None,
+            })
+            .await
+    }
+
+    pub async fn get_rows(&self, table_js: JsString) -> Result<JsValue, IDBError> {
+        let table: String = table_js.into();
+        let rows = self.storage.get_rows(&table).await?;
+
+        Ok(serde_wasm_bindgen::to_value(&rows).unwrap())
+    }
+}

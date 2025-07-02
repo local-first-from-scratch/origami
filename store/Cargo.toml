@@ -7,7 +7,7 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-uuid = { version = "1.17.0", features = ["js", "v4", "rng", "serde"] }
+uuid = { version = "1.17.0", features = ["js", "v4", "rng", "serde", "v7"] }
 migrate = { path = "../migrate" }
 wasm-bindgen = { version = "0.2.100", features = ["strict-macro"] }
 idb = { version = "0.6.4", features = ["builder"] }

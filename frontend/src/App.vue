@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import { store, greet } from 'store';
+import { ref } from 'vue';
 
-store().then((s) => console.log(s));
+const rows = ref([]);
+
+store().then((s) => {
+  console.log(s);
+  s.insert_test().then((r) => console.log(r));
+  s.get_rows('test').then((r) => rows.value = r)
+});
 </script>
 
 <template>
     <div class="content">
         <h1>Rsbuild with Vue</h1>
         <p>Start building amazing things with Rsbuild.</p>
-        {{ greet("Brian") }}
+        <template v-for="row in rows">
+            <code>{{ row }}</code>
+        </template>
     </div>
 </template>
 
