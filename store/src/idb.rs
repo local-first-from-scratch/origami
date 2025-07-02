@@ -80,7 +80,7 @@ impl IDBStorage {
 #[derive(Debug, thiserror::Error)]
 pub enum IDBError {
     #[error("IndexedDB error: {0}")]
-    IDBError(#[from] idb::Error),
+    IDB(#[from] idb::Error),
 
     #[error("Serde error: {0}")]
     Serde(#[from] serde_wasm_bindgen::Error),
