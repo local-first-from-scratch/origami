@@ -9,7 +9,7 @@
       "devDependencies": {
         "@biomejs/biome": "2.0.6",
         "@rsbuild/core": "1.4.3",
-        "@rsbuild/plugin-vue": "1.0.7",
+        "@rsbuild/plugin-vue": "1.1.0",
         "rsbuild-plugin-wasmpack": "0.0.3",
         "typescript": "5.8.3",
         "vue-tsc": "3.0.0",
@@ -96,7 +96,7 @@
 
     "@rsbuild/core": ["@rsbuild/core@1.4.3", "", { "dependencies": { "@rspack/core": "1.4.2", "@rspack/lite-tapable": "~1.0.1", "@swc/helpers": "^0.5.17", "core-js": "~3.43.0", "jiti": "^2.4.2" }, "bin": { "rsbuild": "bin/rsbuild.js" } }, "sha512-97vmVaOXUxID85cVSDFHLFmDfeJTR4SoOHbn7kknkEeZFg3wHlDYhx+lbQPOZf+toHOm8d1w1LlunxVkCAdHLg=="],
 
-    "@rsbuild/plugin-vue": ["@rsbuild/plugin-vue@1.0.7", "", { "dependencies": { "vue-loader": "^17.4.2", "webpack": "^5.98.0" }, "peerDependencies": { "@rsbuild/core": "1.x" } }, "sha512-VIXFIU2gcpRjDxZNR9QUZjFqWu3oPZ5a5AUe8cyv2moJBQzRPJ18VtPnIIcdlQB36Q8lm2Do0SSVqkXAuui65g=="],
+    "@rsbuild/plugin-vue": ["@rsbuild/plugin-vue@1.1.0", "", { "dependencies": { "vue-loader": "^17.4.2", "webpack": "^5.99.9" }, "peerDependencies": { "@rsbuild/core": "1.x" } }, "sha512-SQ8CoS7qUTQUYcMxWgMLQcukE/fQ5pIzMDkvpqqoV4zQyWcw0kJ5z34ctCIaIA4vvOhXwuEi2XLwQalvGQI8Tg=="],
 
     "@rspack/binding": ["@rspack/binding@1.4.2", "", { "optionalDependencies": { "@rspack/binding-darwin-arm64": "1.4.2", "@rspack/binding-darwin-x64": "1.4.2", "@rspack/binding-linux-arm64-gnu": "1.4.2", "@rspack/binding-linux-arm64-musl": "1.4.2", "@rspack/binding-linux-x64-gnu": "1.4.2", "@rspack/binding-linux-x64-musl": "1.4.2", "@rspack/binding-wasm32-wasi": "1.4.2", "@rspack/binding-win32-arm64-msvc": "1.4.2", "@rspack/binding-win32-ia32-msvc": "1.4.2", "@rspack/binding-win32-x64-msvc": "1.4.2" } }, "sha512-NdTLlA20ufD0thFvDIwwPk+bX9yo3TDE4XjfvZYbwFyYvBgqJOWQflnbwLgvSTck0MSTiOqWIqpR88ymAvWTqg=="],
 
