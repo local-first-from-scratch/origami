@@ -7,7 +7,9 @@ const rows = ref([]);
 store().then((s) => {
   console.log(s);
   s.insert_test().then((r) => console.log(r));
-  s.get_rows('test').then((r) => rows.value = r)
+  s.get_rows('test').then((r) => {
+    rows.value = r;
+  });
 });
 </script>
 
