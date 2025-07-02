@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { store, greet } from 'store';
+import { store } from 'store';
 import { ref } from 'vue';
 
 const rows = ref([]);
