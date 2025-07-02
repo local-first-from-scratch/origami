@@ -7,4 +7,22 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+uuid = { version = "1.17.0", features = ["js", "rng", "serde", "v7"] }
+# migrate = { path = "../migrate" }
 wasm-bindgen = { version = "0.2.100", features = ["strict-macro"] }
+idb = { version = "0.6.4", features = ["builder"] }
+thiserror = "2.0.12"
+serde = { version = "1.0.219", features = ["derive"] }
+serde-wasm-bindgen = "0.6.5"
+wasm-bindgen-futures = "0.4.50"
+
+[dev-dependencies]
+pretty_assertions = "1.4.1"
+proptest = "1.7.0"
+proptest-derive = "0.6.0"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-Oz']
+
+[package.metadata.wasm-pack.profile.profiling]
+wasm-opt = ['-g', '-O']
