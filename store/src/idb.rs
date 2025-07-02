@@ -89,8 +89,8 @@ pub enum IDBError {
     MissingCursor,
 }
 
-impl Into<JsValue> for IDBError {
-    fn into(self) -> JsValue {
-        JsValue::from_str(&self.to_string())
+impl From<IDBError> for JsValue {
+    fn from(val: IDBError) -> Self {
+        JsValue::from_str(&val.to_string())
     }
 }
