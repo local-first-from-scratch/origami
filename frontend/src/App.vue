@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { store } from 'store';
-import { ref } from 'vue';
+import { type Ref, ref } from 'vue';
 
-const rows = ref([]);
+type Row = {
+  table: string;
+  id: string;
+  added: { counter: number; node: string };
+};
 
-store().then((s) => {
+const rows: Ref<Row[]> = ref([]);
+
+store<{ test: Row }>({ test: 'bogus' }).then((s) => {
   console.log(s);
-  s.insert_test().then((r) => console.log(r));
-  s.get_rows('test').then((r) => {
+  s.insert('test', '1', {} as Row);
+  s.list('test').then((r) => {
     rows.value = r;
   });
 });
