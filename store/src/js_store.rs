@@ -47,7 +47,11 @@ impl JsStore {
 #[wasm_bindgen]
 impl JsStore {
     #[wasm_bindgen(js_name = "insert")]
-    pub async fn js_insert(&self, table_js: JsString, data: JsValue) -> Result<JsString, Error> {
+    pub async fn js_insert(
+        &mut self,
+        table_js: JsString,
+        data: JsValue,
+    ) -> Result<JsString, Error> {
         Ok(self
             .store
             .insert(table_js.into(), serde_wasm_bindgen::from_value(data)?)

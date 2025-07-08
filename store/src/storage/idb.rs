@@ -64,7 +64,7 @@ impl IDBStorage {
 impl Storage for IDBStorage {
     type Error = IDBError;
 
-    async fn store_row(&self, row: Row) -> Result<(), IDBError> {
+    async fn store_row(&mut self, row: Row) -> Result<(), IDBError> {
         let tx = self
             .database
             .transaction(&["row"], TransactionMode::ReadWrite)?;

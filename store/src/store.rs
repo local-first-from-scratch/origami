@@ -18,7 +18,7 @@ impl<S: Storage> Store<S> {
     }
 
     pub async fn insert(
-        &self,
+        &mut self,
         table: String,
         data: BTreeMap<String, Value>,
     ) -> Result<Uuid, Error<S::Error>> {
