@@ -8,13 +8,16 @@ use uuid::Uuid;
 use wasm_bindgen::JsValue;
 
 pub struct Store<S: Storage> {
-    table_map: BTreeMap<String, String>,
+    table_to_schema: BTreeMap<String, String>,
     storage: S,
 }
 
 impl<S: Storage> Store<S> {
     pub fn new(table_map: BTreeMap<String, String>, storage: S) -> Self {
-        Self { table_map, storage }
+        Self {
+            table_to_schema,
+            storage,
+        }
     }
 
     pub async fn insert(
