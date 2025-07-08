@@ -20,6 +20,7 @@ wasm-bindgen-futures = "0.4.50"
 pretty_assertions = "1.4.1"
 proptest = "1.7.0"
 proptest-derive = "0.6.0"
+tokio = { version = "1.46.1", features = ["macros", "rt"] }
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-Oz']

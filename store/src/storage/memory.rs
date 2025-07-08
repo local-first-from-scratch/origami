@@ -2,6 +2,7 @@ use crate::op::Row;
 
 use super::Storage;
 
+#[derive(Default)]
 pub struct MemoryStorage {
     rows: Vec<Row>,
 }

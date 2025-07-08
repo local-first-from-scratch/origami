@@ -48,3 +48,23 @@ impl<E: std::error::Error + Display> From<Error<E>> for JsValue {
         JsValue::from_str(&val.to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::memory::MemoryStorage;
+
+    fn init() -> Store<MemoryStorage> {
+        Store::new(BTreeMap::new(), MemoryStorage::default())
+    }
+
+    #[tokio::test]
+    async fn test_insert_success() {
+        let mut store = init();
+
+        store
+            .insert("test".to_string(), BTreeMap::new())
+            .await
+            .unwrap();
+    }
+}
