@@ -3,7 +3,6 @@ use crate::storage::Storage;
 use crate::timestamp::Timestamp;
 use migrate::Value;
 use std::collections::BTreeMap;
-use std::error::Error;
 use std::fmt::Display;
 use uuid::Uuid;
 use wasm_bindgen::JsValue;
@@ -22,7 +21,7 @@ impl<S: Storage> Store<S> {
         &self,
         table: String,
         data: BTreeMap<String, Value>,
-    ) -> Result<Uuid, StoreError<S::Error>> {
+    ) -> Result<Uuid, Error<S::Error>> {
         let id = Uuid::now_v7();
 
         self.storage
@@ -32,23 +31,20 @@ impl<S: Storage> Store<S> {
                 added: Timestamp::new(0, Uuid::nil()),
                 removed: None,
             })
-            .await
-            .map_err(StoreError::Storage)?;
+            .await?;
 
         Ok(id)
     }
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum StoreError<S: Error> {
-    #[error("Invalid schema. Schemas must be an object with string keys and values.")]
-    Schema(serde_wasm_bindgen::Error),
+pub enum Error<E: std::error::Error> {
     #[error("Storage error: {0}")]
-    Storage(S),
+    Storage(#[from] E),
 }
 
-impl<S: Error + Display> From<StoreError<S>> for JsValue {
-    fn from(val: StoreError<S>) -> Self {
+impl<E: std::error::Error + Display> From<Error<E>> for JsValue {
+    fn from(val: Error<E>) -> Self {
         JsValue::from_str(&val.to_string())
     }
 }

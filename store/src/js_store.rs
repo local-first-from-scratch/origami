@@ -1,5 +1,5 @@
 use crate::storage::idb::{IDBError, IDBStorage};
-use crate::store::{Store, StoreError};
+use crate::store::{self, Store};
 use std::collections::BTreeMap;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::JsString;
@@ -29,10 +29,10 @@ pub struct JsStore {
 /// that in the object's constructor would make things look really weird on the
 /// JavaScript side.
 #[wasm_bindgen(skip_typescript)]
-pub async fn store(schemas: JsValue) -> Result<JsStore, StoreError<IDBError>> {
+pub async fn store(schemas: JsValue) -> Result<JsStore, Error> {
     Ok(JsStore::new(
-        serde_wasm_bindgen::from_value(schemas).map_err(StoreError::Schema)?,
-        IDBStorage::init().await.map_err(StoreError::Storage)?,
+        serde_wasm_bindgen::from_value(schemas)?,
+        IDBStorage::init().await?,
     ))
 }
 
@@ -47,27 +47,36 @@ impl JsStore {
 #[wasm_bindgen]
 impl JsStore {
     #[wasm_bindgen(js_name = "insert")]
-    pub async fn js_insert(
-        &self,
-        table_js: JsString,
-        data: JsValue,
-    ) -> Result<JsString, StoreError<IDBError>> {
+    pub async fn js_insert(&self, table_js: JsString, data: JsValue) -> Result<JsString, Error> {
         Ok(self
             .store
-            .insert(
-                table_js.into(),
-                serde_wasm_bindgen::from_value(data).map_err(StoreError::Schema)?,
-            )
+            .insert(table_js.into(), serde_wasm_bindgen::from_value(data)?)
             .await?
             .to_string()
             .into())
     }
 
-    pub async fn list(&self, _table_js: JsString) -> Result<JsValue, StoreError<IDBError>> {
+    pub async fn list(&self, _table_js: JsString) -> Result<JsValue, Error> {
         // let table: String = table_js.into();
         // let rows = self.storage.get_rows(&table).await?;
 
         // Ok(serde_wasm_bindgen::to_value(&rows).unwrap())
         todo!()
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("Invalid schema. Schemas must be an object with string keys and values.")]
+    Serde(#[from] serde_wasm_bindgen::Error),
+    #[error("IndexedDB error: {0}")]
+    Idb(#[from] IDBError),
+    #[error("Store error: {0}")]
+    Store(#[from] store::Error<IDBError>),
+}
+
+impl From<Error> for JsValue {
+    fn from(val: Error) -> Self {
+        JsValue::from_str(&val.to_string())
     }
 }
