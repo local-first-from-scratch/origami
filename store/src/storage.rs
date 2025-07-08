@@ -1,4 +1,5 @@
 pub mod idb;
+pub mod memory;
 
 use crate::op::Row;
 
