@@ -1,6 +1,7 @@
 use crate::idb::{IDBError, IDBStorage};
 use crate::op::Row;
 use crate::timestamp::Timestamp;
+use std::collections::BTreeMap;
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::JsString;
@@ -22,6 +23,7 @@ export class Store<T extends TypeMap> {
 
 #[wasm_bindgen(skip_typescript)]
 pub struct Store {
+    schemas: BTreeMap<String, String>,
     storage: IDBStorage,
 }
 
@@ -30,23 +32,43 @@ pub struct Store {
 /// that in the object's constructor would make things look really weird on the
 /// JavaScript side.
 #[wasm_bindgen(skip_typescript)]
-pub async fn store() -> Result<Store, IDBError> {
-    Ok(Store::from_storage(IDBStorage::init().await?))
+pub async fn store(schemas: JsValue) -> Result<Store, StoreError> {
+    Ok(Store::new(
+        serde_wasm_bindgen::from_value(schemas)?,
+        IDBStorage::init().await?,
+    ))
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum StoreError {
+    #[error("Invalid schema. Schemas must be an object with string keys and values.")]
+    Schema(#[from] serde_wasm_bindgen::Error),
+    #[error("IDB error: {0}")]
+    Idb(#[from] idb::Error),
+}
+
+impl From<StoreError> for JsValue {
+    fn from(val: StoreError) -> Self {
+        JsValue::from_str(&val.to_string())
+    }
 }
 
 impl Store {
-    fn from_storage(storage: IDBStorage) -> Self {
-        Self { storage }
+    fn new(schemas: BTreeMap<String, String>, storage: IDBStorage) -> Self {
+        Self { schemas, storage }
     }
 }
 
 #[wasm_bindgen]
 impl Store {
     pub async fn insert(&self, table_js: JsString, _data: JsValue) -> Result<(), IDBError> {
+        let table: String = table_js.into();
+        let id = Uuid::now_v7();
+
         self.storage
             .new_row(Row {
-                table: table_js.into(),
-                id: Uuid::now_v7(),
+                table,
+                id,
                 added: Timestamp::new(0, Uuid::nil()),
                 removed: None,
             })
