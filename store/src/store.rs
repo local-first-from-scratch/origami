@@ -1,6 +1,7 @@
 use crate::idb::{IDBError, IDBStorage};
 use crate::op::Row;
 use crate::timestamp::Timestamp;
+use migrate::Value;
 use std::collections::BTreeMap;
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
@@ -57,23 +58,40 @@ impl Store {
     fn new(schemas: BTreeMap<String, String>, storage: IDBStorage) -> Self {
         Self { schemas, storage }
     }
-}
 
-#[wasm_bindgen]
-impl Store {
-    pub async fn insert(&self, table_js: JsString, _data: JsValue) -> Result<(), StoreError> {
-        let table: String = table_js.into();
+    pub async fn insert(
+        &self,
+        table: String,
+        data: BTreeMap<String, Value>,
+    ) -> Result<Uuid, StoreError> {
         let id = Uuid::now_v7();
 
-        Ok(self
-            .storage
+        self.storage
             .new_row(Row {
                 table,
                 id,
                 added: Timestamp::new(0, Uuid::nil()),
                 removed: None,
             })
-            .await?)
+            .await?;
+
+        Ok(id)
+    }
+}
+
+#[wasm_bindgen]
+impl Store {
+    #[wasm_bindgen(js_name = "insert")]
+    pub async fn js_insert(
+        &self,
+        table_js: JsString,
+        data: JsValue,
+    ) -> Result<JsString, StoreError> {
+        Ok(self
+            .insert(table_js.into(), serde_wasm_bindgen::from_value(data)?)
+            .await?
+            .to_string()
+            .into())
     }
 
     pub async fn list(&self, table_js: JsString) -> Result<JsValue, StoreError> {
