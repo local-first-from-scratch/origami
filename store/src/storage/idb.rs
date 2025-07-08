@@ -11,7 +11,7 @@ pub struct IDBStorage {
 }
 
 impl IDBStorage {
-    pub async fn init() -> Result<Self, IDBError> {
+    pub async fn init() -> Result<Self, Error> {
         let database = DatabaseBuilder::new("ops")
             .add_object_store(
                 ObjectStoreBuilder::new("row")
@@ -39,7 +39,7 @@ impl IDBStorage {
         Ok(Self { database })
     }
 
-    pub async fn get_rows(&self, table: &str) -> Result<Vec<Row>, IDBError> {
+    pub async fn get_rows(&self, table: &str) -> Result<Vec<Row>, Error> {
         let tx = self
             .database
             .transaction(&["row"], TransactionMode::ReadOnly)?;
@@ -50,7 +50,7 @@ impl IDBStorage {
         let cursor = by_table
             .open_cursor(Some(Query::Key(table.into())), Some(CursorDirection::Next))?
             .await?
-            .ok_or(IDBError::MissingCursor)?;
+            .ok_or(Error::MissingCursor)?;
 
         let mut out = Vec::new();
         while let Some(raw_row) = cursor.next(None)?.await? {
@@ -62,9 +62,9 @@ impl IDBStorage {
 }
 
 impl Storage for IDBStorage {
-    type Error = IDBError;
+    type Error = Error;
 
-    async fn store_row(&mut self, row: Row) -> Result<(), IDBError> {
+    async fn store_row(&mut self, row: Row) -> Result<(), Error> {
         let tx = self
             .database
             .transaction(&["row"], TransactionMode::ReadWrite)?;
@@ -83,7 +83,7 @@ impl Storage for IDBStorage {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum IDBError {
+pub enum Error {
     #[error("IndexedDB error: {0}")]
     Idb(#[from] idb::Error),
 
@@ -94,8 +94,8 @@ pub enum IDBError {
     MissingCursor,
 }
 
-impl From<IDBError> for JsValue {
-    fn from(val: IDBError) -> Self {
+impl From<Error> for JsValue {
+    fn from(val: Error) -> Self {
         JsValue::from_str(&val.to_string())
     }
 }

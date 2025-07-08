@@ -1,4 +1,4 @@
-use crate::storage::idb::{IDBError, IDBStorage};
+use crate::storage::idb::{self, IDBStorage};
 use crate::store::{self, Store};
 use std::collections::BTreeMap;
 use wasm_bindgen::prelude::*;
@@ -74,9 +74,9 @@ pub enum Error {
     #[error("Invalid schema. Schemas must be an object with string keys and values.")]
     Serde(#[from] serde_wasm_bindgen::Error),
     #[error("IndexedDB error: {0}")]
-    Idb(#[from] IDBError),
+    Idb(#[from] idb::Error),
     #[error("Store error: {0}")]
-    Store(#[from] store::Error<IDBError>),
+    Store(#[from] store::Error<idb::Error>),
 }
 
 impl From<Error> for JsValue {

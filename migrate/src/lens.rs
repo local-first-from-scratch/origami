@@ -25,38 +25,35 @@ impl Lens {
         }
     }
 
-    pub fn transform_defaults(
-        &self,
-        defaults: &mut BTreeMap<String, Value>,
-    ) -> Result<(), TransformError> {
+    pub fn transform_defaults(&self, defaults: &mut BTreeMap<String, Value>) -> Result<(), Error> {
         match self {
             Lens::Add(lens) => match defaults.entry(lens.name.clone()) {
                 Entry::Vacant(vacant_entry) => {
                     vacant_entry.insert(lens.default.clone());
                     Ok(())
                 }
-                Entry::Occupied(_) => Err(TransformError::ConflictingFieldOnAdd(lens.name.clone())),
+                Entry::Occupied(_) => Err(Error::ConflictingFieldOnAdd(lens.name.clone())),
             },
             Lens::Remove(lens) => match defaults.remove(&lens.name) {
                 Some(_) => Ok(()),
-                None => Err(TransformError::MissingFieldOnRemove(lens.name.clone())),
+                None => Err(Error::MissingFieldOnRemove(lens.name.clone())),
             },
             Lens::Rename { from, to } => match defaults.remove(from) {
                 Some(value) => {
                     defaults.insert(to.clone(), value);
                     Ok(())
                 }
-                None => Err(TransformError::MissingFieldOnRename(from.clone())),
+                None => Err(Error::MissingFieldOnRename(from.clone())),
             },
         }
     }
 
-    pub fn transform_jtd(&self, jtd: &mut Schema) -> Result<(), TransformError> {
+    pub fn transform_jtd(&self, jtd: &mut Schema) -> Result<(), Error> {
         match jtd {
             Schema::Properties { properties, .. } => match self {
                 Lens::Add(lens) => {
                     if properties.contains_key(&lens.name) {
-                        Err(TransformError::ConflictingFieldOnAdd(lens.name.clone()))
+                        Err(Error::ConflictingFieldOnAdd(lens.name.clone()))
                     } else {
                         properties.insert(lens.name.clone(), (&lens.type_).into());
                         Ok(())
@@ -67,7 +64,7 @@ impl Lens {
                         properties.remove(&lens.name);
                         Ok(())
                     } else {
-                        Err(TransformError::MissingFieldOnRemove(lens.name.clone()))
+                        Err(Error::MissingFieldOnRemove(lens.name.clone()))
                     }
                 }
                 Lens::Rename { from, to } => match properties.remove(from) {
@@ -75,17 +72,17 @@ impl Lens {
                         properties.insert(to.clone(), value);
                         Ok(())
                     }
-                    None => Err(TransformError::MissingFieldOnRename(from.clone())),
+                    None => Err(Error::MissingFieldOnRename(from.clone())),
                 },
             },
 
-            _ => Err(TransformError::UnsupportedSchemaType),
+            _ => Err(Error::UnsupportedSchemaType),
         }
     }
 }
 
 #[derive(Debug, thiserror::Error, PartialEq)]
-pub enum TransformError {
+pub enum Error {
     #[error("Unsupported schema type. We can only transform `properties` schemas.")]
     UnsupportedSchemaType,
     #[error("Tried to add `{0}`, but it already exists.")]
@@ -197,7 +194,7 @@ mod tests {
 
             assert_eq!(
                 lens.transform_defaults(&mut defaults).unwrap_err(),
-                TransformError::ConflictingFieldOnAdd("test".to_string())
+                Error::ConflictingFieldOnAdd("test".to_string())
             );
         }
 
@@ -229,7 +226,7 @@ mod tests {
 
             assert_eq!(
                 lens.transform_defaults(&mut defaults).unwrap_err(),
-                TransformError::MissingFieldOnRemove("test".to_string())
+                Error::MissingFieldOnRemove("test".to_string())
             );
         }
 
@@ -261,7 +258,7 @@ mod tests {
 
             assert_eq!(
                 lens.transform_defaults(&mut defaults).unwrap_err(),
-                TransformError::MissingFieldOnRename("test".to_string())
+                Error::MissingFieldOnRename("test".to_string())
             );
         }
     }
@@ -306,7 +303,7 @@ mod tests {
 
             assert_eq!(
                 lens.transform_jtd(&mut base).unwrap_err(),
-                TransformError::ConflictingFieldOnAdd("test".to_string())
+                Error::ConflictingFieldOnAdd("test".to_string())
             );
         }
 
@@ -337,7 +334,7 @@ mod tests {
 
             assert_eq!(
                 lens.transform_jtd(&mut base).unwrap_err(),
-                TransformError::MissingFieldOnRemove("test".to_string())
+                Error::MissingFieldOnRemove("test".to_string())
             );
         }
 
@@ -366,7 +363,7 @@ mod tests {
 
             assert_eq!(
                 lens.transform_jtd(&mut base).unwrap_err(),
-                TransformError::MissingFieldOnRename("test".to_string())
+                Error::MissingFieldOnRename("test".to_string())
             );
         }
     }
