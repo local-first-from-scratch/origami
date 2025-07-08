@@ -44,7 +44,7 @@ pub enum StoreError {
     #[error("Invalid schema. Schemas must be an object with string keys and values.")]
     Schema(#[from] serde_wasm_bindgen::Error),
     #[error("IDB error: {0}")]
-    Idb(#[from] idb::Error),
+    Idb(#[from] IDBError),
 }
 
 impl From<StoreError> for JsValue {
@@ -61,21 +61,22 @@ impl Store {
 
 #[wasm_bindgen]
 impl Store {
-    pub async fn insert(&self, table_js: JsString, _data: JsValue) -> Result<(), IDBError> {
+    pub async fn insert(&self, table_js: JsString, _data: JsValue) -> Result<(), StoreError> {
         let table: String = table_js.into();
         let id = Uuid::now_v7();
 
-        self.storage
+        Ok(self
+            .storage
             .new_row(Row {
                 table,
                 id,
                 added: Timestamp::new(0, Uuid::nil()),
                 removed: None,
             })
-            .await
+            .await?)
     }
 
-    pub async fn list(&self, table_js: JsString) -> Result<JsValue, IDBError> {
+    pub async fn list(&self, table_js: JsString) -> Result<JsValue, StoreError> {
         let table: String = table_js.into();
         let rows = self.storage.get_rows(&table).await?;
 

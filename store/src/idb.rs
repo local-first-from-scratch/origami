@@ -10,7 +10,7 @@ pub struct IDBStorage {
 }
 
 impl IDBStorage {
-    pub async fn init() -> Result<Self, idb::Error> {
+    pub async fn init() -> Result<Self, IDBError> {
         let database = DatabaseBuilder::new("ops")
             .add_object_store(
                 ObjectStoreBuilder::new("row")
