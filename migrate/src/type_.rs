@@ -1,8 +1,6 @@
-use std::{collections::BTreeMap, fmt::Display};
-
+use crate::Value;
 use jtd::Schema;
-
-use crate::value::Value;
+use std::{collections::BTreeMap, fmt::Display};
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]

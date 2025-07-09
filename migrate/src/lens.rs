@@ -1,5 +1,5 @@
-use crate::type_::{SerdeType, Type};
-use crate::{Value, value};
+use crate::type_::SerdeType;
+use crate::{Type, Value, value};
 use jtd::Schema;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;

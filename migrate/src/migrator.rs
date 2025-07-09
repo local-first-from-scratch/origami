@@ -1,5 +1,4 @@
-use crate::lens::Lens;
-use crate::migration::Migration;
+use crate::{Lens, Migration};
 use petgraph::{Directed, Graph, algo::astar, graph::NodeIndex};
 use std::collections::HashMap;
 
