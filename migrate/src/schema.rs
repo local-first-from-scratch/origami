@@ -28,6 +28,15 @@ impl Schema {
     }
 }
 
+impl IntoIterator for Schema {
+    type Item = (String, Field);
+    type IntoIter = std::collections::btree_map::IntoIter<String, Field>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 impl From<Schema> for jtd::Schema {
     fn from(schema: Schema) -> Self {
         let mut properties = BTreeMap::new();
