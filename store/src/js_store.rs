@@ -1,5 +1,6 @@
 use crate::storage::idb::{self, IDBStorage};
 use crate::store::{self, Store};
+use migrate::{Migration, Migrator};
 use std::collections::BTreeMap;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::JsString;
@@ -9,7 +10,7 @@ const TS_APPEND_CONTENT: &'static str = r#"
 
 export type TypeMap = Record<string, any>;
 
-export function store<T extends TypeMap>(schemas: Record<keyof T, string>): Promise<Store<T>>;
+export function store<T extends TypeMap>(schemas: Record<keyof T, string>, migrations: any[]): Promise<Store<T>>;
 
 export class Store<T extends TypeMap> {
   insert<K extends keyof T>(table: K, id: string, data: T[K]): Promise<void>;
@@ -29,17 +30,24 @@ pub struct JsStore {
 /// that in the object's constructor would make things look really weird on the
 /// JavaScript side.
 #[wasm_bindgen(skip_typescript)]
-pub async fn store(schemas: JsValue) -> Result<JsStore, Error> {
+pub async fn store(schemas: JsValue, migrations_raw: JsValue) -> Result<JsStore, Error> {
+    let mut migrator = Migrator::new();
+    let migrations: Vec<Migration> = serde_wasm_bindgen::from_value(migrations_raw)?;
+    for migration in migrations {
+        migrator.add_migration(migration);
+    }
+
     Ok(JsStore::new(
+        migrator,
         serde_wasm_bindgen::from_value(schemas)?,
         IDBStorage::init().await?,
     ))
 }
 
 impl JsStore {
-    pub fn new(schemas: BTreeMap<String, String>, storage: IDBStorage) -> Self {
+    pub fn new(migrator: Migrator, schemas: BTreeMap<String, String>, storage: IDBStorage) -> Self {
         JsStore {
-            store: Store::new(schemas, storage),
+            store: Store::new(migrator, schemas, storage),
         }
     }
 }

@@ -1,20 +1,22 @@
 use crate::op::Row;
 use crate::storage::Storage;
 use crate::timestamp::Timestamp;
-use migrate::Value;
+use migrate::{Migrator, Value};
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use uuid::Uuid;
 use wasm_bindgen::JsValue;
 
 pub struct Store<S: Storage> {
+    migrator: Migrator,
     table_to_schema: BTreeMap<String, String>,
     storage: S,
 }
 
 impl<S: Storage> Store<S> {
-    pub fn new(table_map: BTreeMap<String, String>, storage: S) -> Self {
+    pub fn new(migrator: Migrator, table_to_schema: BTreeMap<String, String>, storage: S) -> Self {
         Self {
+            migrator,
             table_to_schema,
             storage,
         }
@@ -58,7 +60,7 @@ mod tests {
     use crate::storage::memory::MemoryStorage;
 
     fn init() -> Store<MemoryStorage> {
-        Store::new(BTreeMap::new(), MemoryStorage::default())
+        Store::new(Migrator::new(), BTreeMap::new(), MemoryStorage::default())
     }
 
     #[tokio::test]

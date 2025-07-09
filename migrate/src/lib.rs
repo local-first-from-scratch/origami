@@ -1,7 +1,9 @@
 mod lens;
-pub mod migration;
-pub mod migrator;
+mod migration;
+mod migrator;
 mod type_;
 mod value;
 
+pub use migration::Migration;
+pub use migrator::Migrator;
 pub use value::Value;
