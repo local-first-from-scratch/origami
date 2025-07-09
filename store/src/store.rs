@@ -27,6 +27,11 @@ impl<S: Storage> Store<S> {
         table: String,
         data: BTreeMap<String, Value>,
     ) -> Result<Uuid, Error<S::Error>> {
+        let schema = self
+            .table_to_schema
+            .get(&table)
+            .ok_or_else(|| Error::TableNotFound(table.clone()))?;
+
         let id = Uuid::now_v7();
 
         self.storage
@@ -46,6 +51,9 @@ impl<S: Storage> Store<S> {
 pub enum Error<E: std::error::Error> {
     #[error("Storage error: {0}")]
     Storage(#[from] E),
+
+    #[error("Schema not found for table {0}")]
+    TableNotFound(String),
 }
 
 impl<E: std::error::Error + Display> From<Error<E>> for JsValue {
@@ -60,7 +68,18 @@ mod tests {
     use crate::storage::memory::MemoryStorage;
 
     fn init() -> Store<MemoryStorage> {
-        Store::new(Migrator::new(), BTreeMap::new(), MemoryStorage::default())
+        let mut migrator = Migrator::new();
+        migrator.add_migration(migrate::Migration {
+            id: "test.v1".to_string(),
+            base: None,
+            ops: vec![],
+        });
+
+        Store::new(
+            migrator,
+            BTreeMap::from([("test".into(), "test.v1".into())]),
+            MemoryStorage::default(),
+        )
     }
 
     #[tokio::test]
