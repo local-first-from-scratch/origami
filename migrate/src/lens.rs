@@ -107,9 +107,9 @@ pub struct SerdeAddRemoveField {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AddRemoveField {
-    name: String,
-    type_: Type,
-    default: value::Value,
+    pub name: String,
+    pub type_: Type,
+    pub default: value::Value,
 }
 
 impl<'de> serde::Deserialize<'de> for AddRemoveField {

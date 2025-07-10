@@ -118,7 +118,7 @@ impl Display for Type {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq)]
 pub enum Error {
     #[error("Invalid value for type {expected}: {got}")]
     InvalidValue { expected: Type, got: Value },
