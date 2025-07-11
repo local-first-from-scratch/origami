@@ -1,4 +1,4 @@
-use super::Storage;
+use super::{RWTransaction, Storage};
 use crate::op::Row;
 use idb::{
     CursorDirection, Database, KeyPath, Query, TransactionMode,
@@ -63,23 +63,49 @@ impl IDBStorage {
 
 impl Storage for IDBStorage {
     type Error = Error;
+    type RWTransaction<'a>
+        = IDBRWTransaction
+    where
+        Self: 'a;
+
+    async fn rw_transaction(&mut self) -> Result<Self::RWTransaction<'_>, Self::Error> {
+        Ok(IDBRWTransaction(self.database.transaction(
+            &["row", "field"],
+            TransactionMode::ReadWrite,
+        )?))
+    }
+}
+
+pub struct IDBRWTransaction(idb::Transaction);
+
+impl RWTransaction for IDBRWTransaction {
+    type Error = Error;
 
     async fn store_row(&mut self, row: Row) -> Result<(), Error> {
-        let tx = self
-            .database
-            .transaction(&["row"], TransactionMode::ReadWrite)?;
-
-        let row_store = tx.object_store("row")?;
+        let row_store = self.0.object_store("row")?;
         row_store.add(&serde_wasm_bindgen::to_value(&row)?, None)?;
-
-        tx.await?;
 
         Ok(())
     }
 
-    // pub async fn get_fields(&self, rows: Vec<uuid::Uuid>) -> Result<Vec<Field>, IDBError> {
-    //     todo!()
-    // }
+    async fn store_field(&mut self, field: crate::op::Field) -> Result<(), Self::Error> {
+        let field_store = self.0.object_store("field")?;
+        field_store.add(&serde_wasm_bindgen::to_value(&field)?, None)?;
+
+        Ok(())
+    }
+
+    async fn commit(self) -> Result<(), Self::Error> {
+        self.0.await?;
+
+        Ok(())
+    }
+
+    async fn abort(self) -> Result<(), Self::Error> {
+        self.0.abort()?;
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

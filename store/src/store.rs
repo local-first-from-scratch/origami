@@ -1,5 +1,5 @@
-use crate::op::Row;
-use crate::storage::Storage;
+use crate::op::{Field, Row};
+use crate::storage::{RWTransaction, Storage};
 use crate::timestamp::Timestamp;
 use migrate::{Migrator, Value, migrator, type_};
 use std::collections::BTreeMap;
@@ -25,7 +25,7 @@ impl<S: Storage> Store<S> {
     pub async fn insert(
         &mut self,
         table: String,
-        data: BTreeMap<String, Value>,
+        mut data: BTreeMap<String, Value>,
     ) -> Result<Uuid, Error<S::Error>> {
         let schema_name = self
             .table_to_schema
@@ -34,28 +34,44 @@ impl<S: Storage> Store<S> {
 
         let schema = self.migrator.schema(schema_name).map_err(Error::Schema)?;
 
-        // TODO: store rows, insert all at once after validation
-        for (name, field) in schema {
-            if let Some(value) = data.get(&name) {
-                field
-                    .type_
-                    .validate(value)
-                    .map_err(|err| Error::Validation(name.clone(), err))?;
-
-                println!("Validated `{name}` with value `{value}`")
-            }
-        }
+        let mut tx = self
+            .storage
+            .rw_transaction()
+            .await
+            .map_err(Error::Storage)?;
 
         let id = Uuid::now_v7();
 
-        self.storage
-            .store_row(Row {
-                table,
-                id,
-                added: Timestamp::new(0, Uuid::nil()),
-                removed: None,
-            })
-            .await?;
+        for (name, field) in schema {
+            if let Some(value) = data.remove(&name) {
+                if let Err(err) = field.type_.validate(&value) {
+                    tx.abort().await.map_err(Error::Storage)?;
+                    return Err(Error::Validation(name.clone(), err));
+                }
+
+                tx.store_field(Field {
+                    table: table.clone(),
+                    row_id: id,
+                    field_name: name,
+                    timestamp: Timestamp::new(0, Uuid::nil()), // TODO: Implement timestamp generation
+                    schema: schema_name.clone(),
+                    value,
+                })
+                .await
+                .map_err(Error::Storage)?;
+            }
+        }
+
+        tx.store_row(Row {
+            table,
+            id,
+            added: Timestamp::new(0, Uuid::nil()), // TODO: Implement timestamp generation
+            removed: None,
+        })
+        .await
+        .map_err(Error::Storage)?;
+
+        tx.commit().await.map_err(Error::Storage)?;
 
         Ok(id)
     }
@@ -108,13 +124,40 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_insert_success() {
+    async fn insert_stores_row() {
         let mut store = init();
 
         store
             .insert("test".to_string(), BTreeMap::new())
             .await
             .unwrap();
+
+        let row = &store.storage.rows[0];
+
+        assert_eq!(row.table, "test");
+        assert_eq!(row.removed, None);
+    }
+
+    #[tokio::test]
+    async fn insert_stores_field() {
+        let mut store = init();
+
+        store
+            .insert(
+                "test".to_string(),
+                BTreeMap::from([("test".into(), "hooray!".into())]),
+            )
+            .await
+            .unwrap();
+
+        let row = &store.storage.rows[0];
+        let field = &store.storage.fields[0];
+
+        assert_eq!(field.table, "test");
+        assert_eq!(field.row_id, row.id);
+        assert_eq!(field.field_name, "test");
+        assert_eq!(field.schema, "test.v1");
+        assert_eq!(field.value, "hooray!".into());
     }
 
     #[tokio::test]
@@ -132,5 +175,9 @@ mod tests {
             matches!(result, Err(Error::Validation(ref name, _)) if name == "test"),
             "Expected validation error for \"test\", got {result:?}"
         );
+
+        // we should have aborted the transaction; no changes to rows or fields
+        assert_eq!(store.storage.rows.len(), 0);
+        assert_eq!(store.storage.fields.len(), 0);
     }
 }
