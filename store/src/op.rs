@@ -17,6 +17,6 @@ pub struct Field {
     pub row_id: Uuid,
     pub field_name: String,
     pub timestamp: Timestamp,
-    pub schema: String,
+    pub schema_version: usize,
     pub value: Value,
 }

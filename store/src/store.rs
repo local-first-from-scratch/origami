@@ -9,15 +9,15 @@ use wasm_bindgen::JsValue;
 
 pub struct Store<S: Storage> {
     migrator: Migrator,
-    table_to_schema: BTreeMap<String, String>,
+    schema_to_version: BTreeMap<String, usize>,
     storage: S,
 }
 
 impl<S: Storage> Store<S> {
-    pub fn new(migrator: Migrator, table_to_schema: BTreeMap<String, String>, storage: S) -> Self {
+    pub fn new(migrator: Migrator, schema_to_version: BTreeMap<String, usize>, storage: S) -> Self {
         Self {
             migrator,
-            table_to_schema,
+            schema_to_version,
             storage,
         }
     }
@@ -27,14 +27,14 @@ impl<S: Storage> Store<S> {
         table: String,
         mut data: BTreeMap<String, Value>,
     ) -> Result<Uuid, Error<S::Error>> {
-        let schema_name = self
-            .table_to_schema
+        let schema_version = self
+            .schema_to_version
             .get(&table)
             .ok_or_else(|| Error::TableNotFound(table.clone()))?;
 
         let schema = self
             .migrator
-            .schema(schema_name, todo!("store schema versions"))
+            .schema(&table, *schema_version)
             .map_err(Error::Schema)?;
 
         let mut tx = self
@@ -57,7 +57,7 @@ impl<S: Storage> Store<S> {
                     row_id: id,
                     field_name: name,
                     timestamp: Timestamp::new(0, Uuid::nil()), // TODO: Implement timestamp generation
-                    schema: schema_name.clone(),
+                    schema_version: *schema_version,
                     value,
                 })
                 .await
@@ -121,7 +121,7 @@ mod tests {
 
         Store::new(
             migrator,
-            BTreeMap::from([("test".into(), "test.v1".into())]),
+            BTreeMap::from([("test".into(), 1)]),
             MemoryStorage::default(),
         )
     }
@@ -159,7 +159,7 @@ mod tests {
         assert_eq!(field.table, "test");
         assert_eq!(field.row_id, row.id);
         assert_eq!(field.field_name, "test");
-        assert_eq!(field.schema, "test.v1");
+        assert_eq!(field.schema_version, 1);
         assert_eq!(field.value, "hooray!".into());
     }
 
