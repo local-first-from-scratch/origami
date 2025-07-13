@@ -43,8 +43,8 @@ impl<'a> RWTransaction for MemoryTransaction<'a> {
     }
 
     async fn commit(mut self) -> Result<(), Self::Error> {
-        self.storage.rows.extend(self.rows.drain(..));
-        self.storage.fields.extend(self.fields.drain(..));
+        self.storage.rows.append(&mut self.rows);
+        self.storage.fields.append(&mut self.fields);
 
         Ok(())
     }
