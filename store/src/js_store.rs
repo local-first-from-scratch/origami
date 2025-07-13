@@ -34,7 +34,7 @@ pub struct Store {
 pub async fn store(schemas: JsValue, migrations_raw: JsValue) -> Result<Store, Error> {
     console_error_panic_hook::set_once();
 
-    let mut migrator = Migrator::new();
+    let mut migrator = Migrator::default();
     let migrations: Vec<Migration> =
         serde_wasm_bindgen::from_value(migrations_raw).map_err(Error::Migration)?;
     for migration in migrations {

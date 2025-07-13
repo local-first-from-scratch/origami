@@ -1,13 +1,13 @@
 {
-	"id": "user.v3",
-	"base": "user.v2",
-	"ops": [
-		{
-			"remove": {
-				"name": "username",
-				"type": "string",
-				"nullable": true
-			}
-		}
-	]
+  "schema": "user",
+  "version": 3,
+  "ops": [
+    {
+      "remove": {
+        "name": "username",
+        "type": "string",
+        "nullable": true
+      }
+    }
+  ]
 }

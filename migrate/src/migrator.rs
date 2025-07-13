@@ -1,117 +1,102 @@
 use crate::{Lens, Migration, Schema, lens};
-use petgraph::{Directed, Graph, algo::astar, graph::NodeIndex};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Migrator {
-    root_node_id: NodeIndex,
-    node_ids: HashMap<String, NodeIndex>,
-    graph: Graph<(), Vec<Lens>, Directed>,
-}
-
-impl Default for Migrator {
-    fn default() -> Self {
-        Self::new()
-    }
+    paths: BTreeMap<String, BTreeMap<(usize, usize), Vec<Lens>>>,
 }
 
 impl Migrator {
-    pub fn new() -> Self {
-        let mut graph = Graph::new();
-        let root_node_id = graph.add_node(());
-
-        Migrator {
-            root_node_id,
-            node_ids: HashMap::from([("ROOT".to_string(), root_node_id)]),
-            graph,
-        }
-    }
-
-    fn node_id(&mut self, name: &str) -> NodeIndex {
-        match self.node_ids.get(name) {
-            Some(id) => *id,
-            None => {
-                let id = self.graph.add_node(());
-                self.node_ids.insert(name.to_string(), id);
-                id
-            }
-        }
-    }
-
     pub fn add_migration(&mut self, migration: Migration) {
-        let Migration { id, base, ops } = migration;
+        let Migration {
+            schema: table,
+            version,
+            ops,
+        } = migration;
 
-        // Generate our node IDs so we can add edges
-        let node_id = self.node_id(&id);
-        let base_id = match base {
-            None => self.root_node_id,
-            Some(base) => self.node_id(&base),
-        };
+        let table_entry = self.paths.entry(table).or_default();
 
-        // Keep track of the name so we can navigate to/from it later
-        self.node_ids.insert(id, node_id);
+        if version == 0 {
+            todo!("Raise an error if version is 0; that's reserved for the blank schema");
+        }
 
-        // Add the paths to base and back, both forward and reverse
-        self.graph.add_edge(
-            node_id,
-            base_id,
-            ops.iter().rev().map(|lens| lens.reversed()).collect(),
+        table_entry.insert(
+            (version, version - 1),
+            ops.iter().rev().map(|op| op.reversed()).collect(),
         );
-        self.graph.add_edge(base_id, node_id, ops);
+        table_entry.insert((version - 1, version), ops);
     }
 
-    pub fn migration_path(&self, from: Option<&str>, to: &str) -> Option<Vec<&Lens>> {
-        let source_node_id = match from {
-            Some(from) => *self.node_ids.get(from)?,
-            None => self.root_node_id,
+    pub fn migration_path(&self, schema: &str, from: usize, to: usize) -> Option<Vec<&Lens>> {
+        let mut out = Vec::new();
+
+        if from == to {
+            return None;
+        }
+
+        let direction = if from < to {
+            Direction::Up
+        } else {
+            Direction::Down
         };
-        let dest_node_id = *self.node_ids.get(to)?;
 
-        astar(
-            &self.graph,
-            source_node_id,
-            |n| n == dest_node_id,
-            |_| 1,
-            |_| 0,
-        )
-        .map(|(_, path)| {
-            let mut out = Vec::with_capacity(path.len());
+        let mut current = from;
 
-            for (src, dest) in path.iter().zip(path.iter().skip(1)) {
-                if let Some(ops) = self
-                    .graph
-                    .find_edge(*src, *dest)
-                    .and_then(|edge| self.graph.edge_weight(edge))
-                {
-                    out.extend(ops)
+        if let Some(paths) = self.paths.get(schema) {
+            while current != to {
+                match paths.get(&(current, direction.tick(current))) {
+                    Some(path) => {
+                        out.extend(path);
+                        current = direction.tick(current);
+                    }
+                    // TODO: say why. This is an error case.
+                    None => return None,
                 }
             }
+        } else {
+            // TODO: say why. This is an error case.
+            return None;
+        };
 
-            out
-        })
+        Some(out)
     }
 
-    pub fn schema(&self, id: &str) -> Result<Schema, Error> {
-        let mut schema = Schema::default();
+    pub fn schema(&self, schema: &str, version: usize) -> Result<Schema, Error> {
+        let mut out = Schema::default();
 
         for lens in self
-            .migration_path(None, id)
-            .ok_or_else(|| Error::MigrationPathNotFound(id.to_string()))?
+            .migration_path(schema, 0, version)
+            .ok_or_else(|| Error::MigrationPathNotFound(schema.to_string(), version))?
         {
-            lens.transform_schema(&mut schema)
+            lens.transform_schema(&mut out)
                 .map_err(Error::CouldNotApply)?;
         }
 
-        Ok(schema)
+        Ok(out)
     }
 }
 
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum Error {
-    #[error("could not find path to migration")]
-    MigrationPathNotFound(String),
+    #[error("could not find path to migration ({0}.{1})")]
+    MigrationPathNotFound(String, usize),
     #[error("could not apply operation: {0}")]
     CouldNotApply(lens::Error),
+}
+
+#[derive(Debug)]
+enum Direction {
+    Up,
+    Down,
+}
+
+impl Direction {
+    fn tick(&self, n: usize) -> usize {
+        match self {
+            Direction::Up => n.saturating_add(1),
+            Direction::Down => n.saturating_sub(1),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -129,69 +114,68 @@ mod tests {
 
     #[test]
     fn migration_path() {
-        let mut migrator = Migrator::new();
+        let mut migrator = Migrator::default();
 
-        let id_a = "a";
         let lens_a = lens!({"add": {
             "name": "a",
             "type": "string",
             "nullable": true,
         }});
         let migration_a = Migration {
-            id: id_a.to_string(),
-            base: None,
+            schema: "test".into(),
+            version: 1,
             ops: vec![lens_a.clone()],
         };
         migrator.add_migration(migration_a.clone());
 
-        let id_b = "b";
         let lens_b = lens!({"rename": {
             "from": "a",
             "to": "b"
         }});
         let migration_b = Migration {
-            id: id_b.to_string(),
-            base: Some(id_a.to_string()),
+            schema: "test".into(),
+            version: 2,
             ops: vec![lens_b.clone()],
         };
         migrator.add_migration(migration_b.clone());
 
-        let id_c = "c";
         let lens_c = lens!({"rename": {
             "from": "b",
             "to": "c"
         }});
         let migration_c = Migration {
-            id: id_c.to_string(),
-            base: Some(id_b.to_string()),
+            schema: "test".into(),
+            version: 3,
             ops: vec![lens_c.clone()],
         };
         migrator.add_migration(migration_c.clone());
 
         assert_eq!(
             Some(vec![&lens_a, &lens_b, &lens_c]),
-            migrator.migration_path(None, id_c)
+            migrator.migration_path("test", 0, 3)
         );
+
+        println!("========================");
 
         assert_eq!(
             Some(vec![&lens_c.reversed(), &lens_b.reversed()]),
-            migrator.migration_path(Some(id_c), id_a)
+            migrator.migration_path("test", 3, 1)
         );
     }
 
     #[test]
     fn schema_missing() {
-        let migrator = Migrator::new();
+        let migrator = Migrator::default();
 
         assert_eq!(
-            migrator.schema("nope"),
-            Err(Error::MigrationPathNotFound("nope".into()))
+            migrator.schema("nope", 1),
+            Err(Error::MigrationPathNotFound("nope".into(), 1))
         )
     }
 
     #[test]
     fn schema_conflict() {
-        let mut migrator = Migrator::new();
+        let mut migrator = Migrator::default();
 
         let same_lens = lens!({"add": {
             "name": "a",
@@ -200,17 +184,17 @@ mod tests {
         }});
 
         migrator.add_migration(Migration {
-            id: "test.v1".into(),
-            base: None,
+            schema: "test".into(),
+            version: 1,
             ops: vec![same_lens.clone()],
         });
         migrator.add_migration(Migration {
-            id: "test.v2".into(),
-            base: Some("test.v1".into()),
+            schema: "test".into(),
+            version: 2,
             ops: vec![same_lens],
         });
 
-        let err = migrator.schema("test.v2").unwrap_err();
+        let err = migrator.schema("test", 2).unwrap_err();
 
         assert!(
             matches!(err, Error::CouldNotApply(..)),
@@ -220,10 +204,10 @@ mod tests {
 
     #[test]
     fn schema_success() {
-        let mut migrator = Migrator::new();
+        let mut migrator = Migrator::default();
         migrator.add_migration(Migration {
-            id: "test.v1".into(),
-            base: None,
+            schema: "test".into(),
+            version: 1,
             ops: vec![lens!({"add": {
                 "name": "a",
                 "type": "string",
@@ -232,7 +216,7 @@ mod tests {
         });
 
         assert_eq!(
-            migrator.schema("test.v1"),
+            migrator.schema("test", 1),
             Ok(Schema::from([(
                 "a",
                 Field {

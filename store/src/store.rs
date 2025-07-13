@@ -32,7 +32,10 @@ impl<S: Storage> Store<S> {
             .get(&table)
             .ok_or_else(|| Error::TableNotFound(table.clone()))?;
 
-        let schema = self.migrator.schema(schema_name).map_err(Error::Schema)?;
+        let schema = self
+            .migrator
+            .schema(schema_name, todo!("store schema versions"))
+            .map_err(Error::Schema)?;
 
         let mut tx = self
             .storage
@@ -105,10 +108,10 @@ mod tests {
     use migrate::{AddRemoveField, Lens, Type};
 
     fn init() -> Store<MemoryStorage> {
-        let mut migrator = Migrator::new();
+        let mut migrator = Migrator::default();
         migrator.add_migration(migrate::Migration {
-            id: "test.v1".to_string(),
-            base: None,
+            schema: "test".into(),
+            version: 1,
             ops: vec![Lens::Add(AddRemoveField {
                 name: "test".into(),
                 type_: Type::String,
