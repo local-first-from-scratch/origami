@@ -2,6 +2,7 @@ use crate::storage::idb::{self, IDBStorage};
 use crate::store::{self, Store as GenericStore};
 use migrate::{Migration, Migrator};
 use std::collections::BTreeMap;
+use tokio::sync::RwLock;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::JsString;
 
@@ -22,7 +23,7 @@ export class Store<T extends TypeMap> {
 
 #[wasm_bindgen(skip_typescript)]
 pub struct Store {
-    store: GenericStore<IDBStorage>,
+    store: RwLock<GenericStore<IDBStorage>>,
 }
 
 /// Technical reason this is separate: store initialization needs to be done asynchronously
@@ -50,17 +51,24 @@ pub async fn store(schemas: JsValue, migrations_raw: JsValue) -> Result<Store, E
 impl Store {
     pub fn new(migrator: Migrator, schemas: BTreeMap<String, String>, storage: IDBStorage) -> Self {
         Store {
-            store: GenericStore::new(migrator, schemas, storage),
+            store: RwLock::new(GenericStore::new(migrator, schemas, storage)),
         }
     }
 }
 
 #[wasm_bindgen]
 impl Store {
+    // Implementation note: all the fields here should borrow self immutably and
+    // use the RwLock to read or write as necessary. If we don't do this, we
+    // could create both a mutable and immutable borrow in async actions on the
+    // JS side and trip the detection against undefined behavior that
+    // wasm-bindgen builds into the binary.
     #[wasm_bindgen]
-    pub async fn insert(&mut self, table_js: JsString, data: JsValue) -> Result<JsString, Error> {
+    pub async fn insert(&self, table_js: JsString, data: JsValue) -> Result<JsString, Error> {
         Ok(self
             .store
+            .write()
+            .await
             .insert(
                 table_js.into(),
                 serde_wasm_bindgen::from_value(data).map_err(Error::Value)?,
@@ -76,7 +84,8 @@ impl Store {
         // let rows = self.storage.get_rows(&table).await?;
 
         // Ok(serde_wasm_bindgen::to_value(&rows).unwrap())
-        todo!()
+        let empty: Vec<()> = Vec::new();
+        serde_wasm_bindgen::to_value(&empty).map_err(Error::Value)
     }
 }
 
