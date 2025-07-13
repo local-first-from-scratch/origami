@@ -1,3 +1,4 @@
+use super::{RWTransaction, Storage};
 use crate::op::Row;
 use idb::{
     CursorDirection, Database, KeyPath, Query, TransactionMode,
@@ -10,7 +11,7 @@ pub struct IDBStorage {
 }
 
 impl IDBStorage {
-    pub async fn init() -> Result<Self, idb::Error> {
+    pub async fn init() -> Result<Self, Error> {
         let database = DatabaseBuilder::new("ops")
             .add_object_store(
                 ObjectStoreBuilder::new("row")
@@ -38,20 +39,7 @@ impl IDBStorage {
         Ok(Self { database })
     }
 
-    pub async fn new_row(&self, row: Row) -> Result<(), IDBError> {
-        let tx = self
-            .database
-            .transaction(&["row"], TransactionMode::ReadWrite)?;
-
-        let row_store = tx.object_store("row")?;
-        row_store.add(&serde_wasm_bindgen::to_value(&row)?, None)?;
-
-        tx.await?;
-
-        Ok(())
-    }
-
-    pub async fn get_rows(&self, table: &str) -> Result<Vec<Row>, IDBError> {
+    pub async fn get_rows(&self, table: &str) -> Result<Vec<Row>, Error> {
         let tx = self
             .database
             .transaction(&["row"], TransactionMode::ReadOnly)?;
@@ -62,7 +50,7 @@ impl IDBStorage {
         let cursor = by_table
             .open_cursor(Some(Query::Key(table.into())), Some(CursorDirection::Next))?
             .await?
-            .ok_or(IDBError::MissingCursor)?;
+            .ok_or(Error::MissingCursor)?;
 
         let mut out = Vec::new();
         while let Some(raw_row) = cursor.next(None)?.await? {
@@ -71,14 +59,57 @@ impl IDBStorage {
 
         Ok(out)
     }
+}
 
-    // pub async fn get_fields(&self, rows: Vec<uuid::Uuid>) -> Result<Vec<Field>, IDBError> {
-    //     todo!()
-    // }
+impl Storage for IDBStorage {
+    type Error = Error;
+    type RWTransaction<'a>
+        = IDBRWTransaction
+    where
+        Self: 'a;
+
+    async fn rw_transaction(&mut self) -> Result<Self::RWTransaction<'_>, Self::Error> {
+        Ok(IDBRWTransaction(self.database.transaction(
+            &["row", "field"],
+            TransactionMode::ReadWrite,
+        )?))
+    }
+}
+
+pub struct IDBRWTransaction(idb::Transaction);
+
+impl RWTransaction for IDBRWTransaction {
+    type Error = Error;
+
+    async fn store_row(&mut self, row: Row) -> Result<(), Error> {
+        let row_store = self.0.object_store("row")?;
+        row_store.add(&serde_wasm_bindgen::to_value(&row)?, None)?;
+
+        Ok(())
+    }
+
+    async fn store_field(&mut self, field: crate::op::Field) -> Result<(), Self::Error> {
+        let field_store = self.0.object_store("field")?;
+        field_store.add(&serde_wasm_bindgen::to_value(&field)?, None)?;
+
+        Ok(())
+    }
+
+    async fn commit(self) -> Result<(), Self::Error> {
+        self.0.await?;
+
+        Ok(())
+    }
+
+    async fn abort(self) -> Result<(), Self::Error> {
+        self.0.abort()?;
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum IDBError {
+pub enum Error {
     #[error("IndexedDB error: {0}")]
     Idb(#[from] idb::Error),
 
@@ -89,8 +120,8 @@ pub enum IDBError {
     MissingCursor,
 }
 
-impl From<IDBError> for JsValue {
-    fn from(val: IDBError) -> Self {
+impl From<Error> for JsValue {
+    fn from(val: Error) -> Self {
         JsValue::from_str(&val.to_string())
     }
 }

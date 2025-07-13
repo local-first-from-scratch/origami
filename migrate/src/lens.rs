@@ -1,6 +1,5 @@
-use crate::type_::{SerdeType, Type};
-use crate::{Value, value};
-use jtd::Schema;
+use crate::type_::SerdeType;
+use crate::{Schema, Type, Value, value};
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 
@@ -25,67 +24,66 @@ impl Lens {
         }
     }
 
-    pub fn transform_defaults(
-        &self,
-        defaults: &mut BTreeMap<String, Value>,
-    ) -> Result<(), TransformError> {
+    pub fn transform_defaults(&self, defaults: &mut BTreeMap<String, Value>) -> Result<(), Error> {
         match self {
             Lens::Add(lens) => match defaults.entry(lens.name.clone()) {
                 Entry::Vacant(vacant_entry) => {
                     vacant_entry.insert(lens.default.clone());
                     Ok(())
                 }
-                Entry::Occupied(_) => Err(TransformError::ConflictingFieldOnAdd(lens.name.clone())),
+                Entry::Occupied(_) => Err(Error::ConflictingFieldOnAdd(lens.name.clone())),
             },
             Lens::Remove(lens) => match defaults.remove(&lens.name) {
                 Some(_) => Ok(()),
-                None => Err(TransformError::MissingFieldOnRemove(lens.name.clone())),
+                None => Err(Error::MissingFieldOnRemove(lens.name.clone())),
             },
             Lens::Rename { from, to } => match defaults.remove(from) {
                 Some(value) => {
                     defaults.insert(to.clone(), value);
                     Ok(())
                 }
-                None => Err(TransformError::MissingFieldOnRename(from.clone())),
+                None => Err(Error::MissingFieldOnRename(from.clone())),
             },
         }
     }
 
-    pub fn transform_jtd(&self, jtd: &mut Schema) -> Result<(), TransformError> {
-        match jtd {
-            Schema::Properties { properties, .. } => match self {
-                Lens::Add(lens) => {
-                    if properties.contains_key(&lens.name) {
-                        Err(TransformError::ConflictingFieldOnAdd(lens.name.clone()))
-                    } else {
-                        properties.insert(lens.name.clone(), (&lens.type_).into());
-                        Ok(())
-                    }
+    pub fn transform_schema(&self, schema: &mut Schema) -> Result<(), Error> {
+        match self {
+            Lens::Add(lens) => {
+                if schema.contains_key(&lens.name) {
+                    Err(Error::ConflictingFieldOnAdd(lens.name.clone()))
+                } else {
+                    schema.insert(
+                        lens.name.clone(),
+                        crate::Field {
+                            type_: lens.type_.clone(),
+                            default: lens.default.clone(),
+                        },
+                    );
+                    Ok(())
                 }
-                Lens::Remove(lens) => {
-                    if properties.contains_key(&lens.name) {
-                        properties.remove(&lens.name);
-                        Ok(())
-                    } else {
-                        Err(TransformError::MissingFieldOnRemove(lens.name.clone()))
-                    }
+            }
+            Lens::Remove(lens) => {
+                if schema.contains_key(&lens.name) {
+                    schema.remove(&lens.name);
+                    Ok(())
+                } else {
+                    Err(Error::MissingFieldOnRemove(lens.name.clone()))
                 }
-                Lens::Rename { from, to } => match properties.remove(from) {
-                    Some(value) => {
-                        properties.insert(to.clone(), value);
-                        Ok(())
-                    }
-                    None => Err(TransformError::MissingFieldOnRename(from.clone())),
-                },
+            }
+            Lens::Rename { from, to } => match schema.remove(from) {
+                Some(value) => {
+                    schema.insert(to.clone(), value);
+                    Ok(())
+                }
+                None => Err(Error::MissingFieldOnRename(from.clone())),
             },
-
-            _ => Err(TransformError::UnsupportedSchemaType),
         }
     }
 }
 
 #[derive(Debug, thiserror::Error, PartialEq)]
-pub enum TransformError {
+pub enum Error {
     #[error("Unsupported schema type. We can only transform `properties` schemas.")]
     UnsupportedSchemaType,
     #[error("Tried to add `{0}`, but it already exists.")]
@@ -109,9 +107,9 @@ pub struct SerdeAddRemoveField {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AddRemoveField {
-    name: String,
-    type_: Type,
-    default: value::Value,
+    pub name: String,
+    pub type_: Type,
+    pub default: value::Value,
 }
 
 impl<'de> serde::Deserialize<'de> for AddRemoveField {
@@ -197,7 +195,7 @@ mod tests {
 
             assert_eq!(
                 lens.transform_defaults(&mut defaults).unwrap_err(),
-                TransformError::ConflictingFieldOnAdd("test".to_string())
+                Error::ConflictingFieldOnAdd("test".to_string())
             );
         }
 
@@ -229,7 +227,7 @@ mod tests {
 
             assert_eq!(
                 lens.transform_defaults(&mut defaults).unwrap_err(),
-                TransformError::MissingFieldOnRemove("test".to_string())
+                Error::MissingFieldOnRemove("test".to_string())
             );
         }
 
@@ -261,42 +259,52 @@ mod tests {
 
             assert_eq!(
                 lens.transform_defaults(&mut defaults).unwrap_err(),
-                TransformError::MissingFieldOnRename("test".to_string())
+                Error::MissingFieldOnRename("test".to_string())
             );
         }
     }
 
-    mod transform_jtd {
+    mod transform_schema {
+        use crate::Field;
+
         use super::*;
         use pretty_assertions::assert_eq;
 
-        macro_rules! schema {
-            ($properties:tt) => {
-                jtd::Schema::from_serde_schema(
-                    serde_json::from_value::<jtd::SerdeSchema>(serde_json::json!({"properties": $properties})).unwrap(),
-                )
-                .unwrap()
-            };
-        }
-
         #[test]
         fn add_field_success() {
-            let mut base = schema!({});
+            let mut base = Schema::default();
 
             let lens = Lens::Add(AddRemoveField {
                 name: "test".into(),
                 type_: Type::String,
-                default: "unused".into(),
+                default: "default".into(),
             });
 
-            lens.transform_jtd(&mut base).unwrap();
+            lens.transform_schema(&mut base).unwrap();
 
-            assert_eq!(base, schema!({"test": {"type": "string"}}));
+            assert_eq!(
+                base,
+                Schema::from([(
+                    "test",
+                    Field {
+                        type_: Type::String,
+                        default: "default".into()
+                    }
+                )])
+            );
         }
 
         #[test]
         fn add_field_conflict() {
-            let mut base = schema!({"test": {"type": "string"}});
+            let mut base = Schema::from([(
+                "test",
+                Field {
+                    type_: Type::String,
+                    default: "default".into(),
+                },
+            )]);
+
+            println!("{base:#?}");
 
             let lens = Lens::Add(AddRemoveField {
                 name: "test".into(),
@@ -305,14 +313,20 @@ mod tests {
             });
 
             assert_eq!(
-                lens.transform_jtd(&mut base).unwrap_err(),
-                TransformError::ConflictingFieldOnAdd("test".to_string())
+                lens.transform_schema(&mut base).unwrap_err(),
+                Error::ConflictingFieldOnAdd("test".to_string())
             );
         }
 
         #[test]
         fn remove_field_success() {
-            let mut base = schema!({"test": {"type": "string"}});
+            let mut base = Schema::from([(
+                "test",
+                Field {
+                    type_: Type::String,
+                    default: "default".into(),
+                },
+            )]);
 
             let lens = Lens::Remove(AddRemoveField {
                 name: "test".into(),
@@ -320,14 +334,14 @@ mod tests {
                 default: "unused".into(),
             });
 
-            lens.transform_jtd(&mut base).unwrap();
+            lens.transform_schema(&mut base).unwrap();
 
-            assert_eq!(base, schema!({}));
+            assert_eq!(base, Schema::default());
         }
 
         #[test]
         fn remove_field_missing() {
-            let mut base = schema!({});
+            let mut base = Schema::default();
 
             let lens = Lens::Remove(AddRemoveField {
                 name: "test".into(),
@@ -336,28 +350,43 @@ mod tests {
             });
 
             assert_eq!(
-                lens.transform_jtd(&mut base).unwrap_err(),
-                TransformError::MissingFieldOnRemove("test".to_string())
+                lens.transform_schema(&mut base).unwrap_err(),
+                Error::MissingFieldOnRemove("test".to_string())
             );
         }
 
         #[test]
         fn rename_field_success() {
-            let mut base = schema!({"test": {"type": "string"}});
+            let mut base = Schema::from([(
+                "test",
+                Field {
+                    type_: Type::String,
+                    default: "default".into(),
+                },
+            )]);
 
             let lens = Lens::Rename {
                 from: "test".into(),
                 to: "new".into(),
             };
 
-            lens.transform_jtd(&mut base).unwrap();
+            lens.transform_schema(&mut base).unwrap();
 
-            assert_eq!(base, schema!({"new": {"type": "string"}}));
+            assert_eq!(
+                base,
+                Schema::from([(
+                    "new",
+                    Field {
+                        type_: Type::String,
+                        default: "default".into(),
+                    },
+                )])
+            );
         }
 
         #[test]
         fn rename_field_missing() {
-            let mut base = schema!({});
+            let mut base = Schema::default();
 
             let lens = Lens::Rename {
                 from: "test".into(),
@@ -365,8 +394,8 @@ mod tests {
             };
 
             assert_eq!(
-                lens.transform_jtd(&mut base).unwrap_err(),
-                TransformError::MissingFieldOnRename("test".to_string())
+                lens.transform_schema(&mut base).unwrap_err(),
+                Error::MissingFieldOnRename("test".to_string())
             );
         }
     }

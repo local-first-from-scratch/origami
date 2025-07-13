@@ -1,7 +1,6 @@
 use clap::Parser;
-use color_eyre::eyre::{Context, ContextCompat, Error};
-use migrate::{migration::Migration, migrator::Migrator};
-use std::collections::BTreeMap;
+use color_eyre::eyre::{Context, Error};
+use migrate::{Migration, Migrator};
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -77,23 +76,8 @@ impl App {
                     migrator.add_migration(migration);
                 }
 
-                let mut schema = jtd::Schema::Properties {
-                    definitions: BTreeMap::new(),
-                    metadata: BTreeMap::new(),
-                    nullable: false,
-                    properties: BTreeMap::new(),
-                    optional_properties: BTreeMap::new(),
-                    properties_is_present: true,
-                    additional_properties: false,
-                };
-
-                for lens in migrator
-                    .migration_path(None, id)
-                    .wrap_err("could not find path to migration")?
-                {
-                    lens.transform_jtd(&mut schema)
-                        .wrap_err("could not apply operation")?;
-                }
+                let schema: jtd::Schema =
+                    migrator.schema(id).wrap_err("could not get schema")?.into();
 
                 serde_json::to_writer_pretty(std::io::stdout(), &schema.into_serde_schema())
                     .wrap_err("could not serialize schema")?;

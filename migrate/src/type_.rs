@@ -1,8 +1,6 @@
-use std::{collections::BTreeMap, fmt::Display};
-
+use crate::Value;
 use jtd::Schema;
-
-use crate::value::Value;
+use std::{collections::BTreeMap, fmt::Display};
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -45,7 +43,7 @@ impl Type {
         matches!(self, Type::Nullable(_))
     }
 
-    pub fn validate(&self, value: &Value) -> Result<(), ValidationError> {
+    pub fn validate(&self, value: &Value) -> Result<(), Error> {
         match (self, value) {
             (Type::String, Value::String(_)) => Ok(()),
             (Type::Int, Value::Int(_)) => Ok(()),
@@ -53,12 +51,12 @@ impl Type {
             (Type::Bool, Value::Bool(_)) => Ok(()),
             (Type::Nullable(_), Value::Null) => Ok(()),
             (Type::Nullable(inner), _) => inner.validate(value).map_err(|err| match err {
-                ValidationError::InvalidValue { got, .. } => ValidationError::InvalidValue {
+                Error::InvalidValue { got, .. } => Error::InvalidValue {
                     expected: self.clone(),
                     got,
                 },
             }),
-            _ => Err(ValidationError::InvalidValue {
+            _ => Err(Error::InvalidValue {
                 expected: self.clone(),
                 got: value.clone(),
             }),
@@ -120,8 +118,8 @@ impl Display for Type {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum ValidationError {
+#[derive(Debug, thiserror::Error, PartialEq)]
+pub enum Error {
     #[error("Invalid value for type {expected}: {got}")]
     InvalidValue { expected: Type, got: Value },
 }

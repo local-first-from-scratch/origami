@@ -1,5 +1,4 @@
-use crate::lens::Lens;
-use crate::migration::Migration;
+use crate::{Lens, Migration, Schema, lens};
 use petgraph::{Directed, Graph, algo::astar, graph::NodeIndex};
 use std::collections::HashMap;
 
@@ -91,10 +90,34 @@ impl Migrator {
             out
         })
     }
+
+    pub fn schema(&self, id: &str) -> Result<Schema, Error> {
+        let mut schema = Schema::default();
+
+        for lens in self
+            .migration_path(None, id)
+            .ok_or_else(|| Error::MigrationPathNotFound(id.to_string()))?
+        {
+            lens.transform_schema(&mut schema)
+                .map_err(Error::CouldNotApply)?;
+        }
+
+        Ok(schema)
+    }
+}
+
+#[derive(Debug, thiserror::Error, PartialEq)]
+pub enum Error {
+    #[error("could not find path to migration")]
+    MigrationPathNotFound(String),
+    #[error("could not apply operation: {0}")]
+    CouldNotApply(lens::Error),
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::{Field, Type, Value};
+
     use super::*;
     use pretty_assertions::assert_eq;
 
@@ -154,5 +177,69 @@ mod tests {
             Some(vec![&lens_c.reversed(), &lens_b.reversed()]),
             migrator.migration_path(Some(id_c), id_a)
         );
+    }
+
+    #[test]
+    fn schema_missing() {
+        let migrator = Migrator::new();
+
+        assert_eq!(
+            migrator.schema("nope"),
+            Err(Error::MigrationPathNotFound("nope".into()))
+        )
+    }
+
+    #[test]
+    fn schema_conflict() {
+        let mut migrator = Migrator::new();
+
+        let same_lens = lens!({"add": {
+            "name": "a",
+            "type": "string",
+            "nullable": true,
+        }});
+
+        migrator.add_migration(Migration {
+            id: "test.v1".into(),
+            base: None,
+            ops: vec![same_lens.clone()],
+        });
+        migrator.add_migration(Migration {
+            id: "test.v2".into(),
+            base: Some("test.v1".into()),
+            ops: vec![same_lens],
+        });
+
+        let err = migrator.schema("test.v2").unwrap_err();
+
+        assert!(
+            matches!(err, Error::CouldNotApply(..)),
+            "Expected CouldNotApply, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn schema_success() {
+        let mut migrator = Migrator::new();
+        migrator.add_migration(Migration {
+            id: "test.v1".into(),
+            base: None,
+            ops: vec![lens!({"add": {
+                "name": "a",
+                "type": "string",
+                "nullable": true,
+            }})],
+        });
+
+        assert_eq!(
+            migrator.schema("test.v1"),
+            Ok(Schema::from([(
+                "a",
+                Field {
+                    type_: Type::Nullable(Box::new(Type::String)),
+                    default: Value::Null,
+                }
+            )]))
+        )
     }
 }

@@ -3,16 +3,29 @@ import { store } from 'store';
 import { type Ref, ref } from 'vue';
 
 type Row = {
-  table: string;
-  id: string;
-  added: { counter: number; node: string };
+  test: string;
 };
 
 const rows: Ref<Row[]> = ref([]);
 
-store<{ test: Row }>({ test: 'bogus' }).then((s) => {
+const migrations = [
+  {
+    id: 'test.v1',
+    ops: [
+      {
+        add: {
+          name: 'test',
+          type: 'string',
+          nullable: true,
+        },
+      },
+    ],
+  },
+];
+
+store<{ test: Row }>({ test: 'test.v1' }, migrations).then((s) => {
   console.log(s);
-  s.insert('test', '1', {} as Row);
+  s.insert('test', { test: 'test' });
   s.list('test').then((r) => {
     rows.value = r;
   });
