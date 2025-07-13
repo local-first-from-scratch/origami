@@ -10,7 +10,8 @@ const rows: Ref<Row[]> = ref([]);
 
 const migrations = [
   {
-    id: 'test.v1',
+    schema: 'test',
+    version: 1,
     ops: [
       {
         add: {
@@ -23,9 +24,9 @@ const migrations = [
   },
 ];
 
-store<{ test: Row }>({ test: 'test.v1' }, migrations).then((s) => {
+store<{ test: Row }>({ test: 1 }, migrations).then(async (s) => {
   console.log(s);
-  s.insert('test', { test: 'test' });
+  console.log(await s.insert('test', { test: 'test' }));
   s.list('test').then((r) => {
     rows.value = r;
   });

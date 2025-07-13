@@ -11,7 +11,7 @@ const TS_APPEND_CONTENT: &'static str = r#"
 
 export type TypeMap = Record<string, any>;
 
-export function store<T extends TypeMap>(schemas: Record<keyof T, string>, migrations: any[]): Promise<Store<T>>;
+export function store<T extends TypeMap>(schemas: Record<keyof T, number>, migrations: any[]): Promise<Store<T>>;
 
 export class Store<T extends TypeMap> {
   insert<K extends keyof T>(table: K, data: T[K]): Promise<void>;
@@ -34,7 +34,7 @@ pub struct Store {
 pub async fn store(schemas: JsValue, migrations_raw: JsValue) -> Result<Store, Error> {
     console_error_panic_hook::set_once();
 
-    let mut migrator = Migrator::new();
+    let mut migrator = Migrator::default();
     let migrations: Vec<Migration> =
         serde_wasm_bindgen::from_value(migrations_raw).map_err(Error::Migration)?;
     for migration in migrations {
@@ -49,7 +49,7 @@ pub async fn store(schemas: JsValue, migrations_raw: JsValue) -> Result<Store, E
 }
 
 impl Store {
-    pub fn new(migrator: Migrator, schemas: BTreeMap<String, String>, storage: IDBStorage) -> Self {
+    pub fn new(migrator: Migrator, schemas: BTreeMap<String, usize>, storage: IDBStorage) -> Self {
         Store {
             store: RwLock::new(GenericStore::new(migrator, schemas, storage)),
         }

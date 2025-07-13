@@ -16,21 +16,25 @@ struct App {
 enum Command {
     /// Create a new migration
     New {
-        /// The name of the eventual schema at this migration (e.g. `users.20250625`)
-        id: String,
-        /// The predecessor of this migration (e.g. `users.20250401`)
-        #[clap(long, short)]
-        base: Option<String>,
+        /// The name of the eventual schema at this migration (e.g. `users`)
+        schema: String,
+        /// The version of this migration (e.g. 3)
+        version: usize,
     },
 
     /// Show the schema at a given ID
-    Schema { id: String },
+    Schema {
+        /// The name of the schema you want to retrieve.
+        schema: String,
+        /// The version of the schema you want to retrieve.
+        version: usize,
+    },
 }
 
 impl App {
     fn run(&self) -> Result<(), Error> {
         match &self.command {
-            Command::New { id, base } => {
+            Command::New { schema, version } => {
                 if !self.dir.exists() {
                     std::fs::create_dir_all(&self.dir).wrap_err_with(|| {
                         format!(
@@ -41,12 +45,14 @@ impl App {
                 }
 
                 let blank = Migration {
-                    id: id.clone(),
-                    base: base.clone(),
+                    schema: schema.clone(),
+                    version: *version,
                     ops: Vec::new(),
                 };
 
-                let file_path = self.dir.join(format!("{}.json", id.replace("/", "_")));
+                let file_path = self
+                    .dir
+                    .join(format!("{}.{version}.json", schema.replace("/", "_")));
                 let file = std::fs::File::create(&file_path).wrap_err_with(|| {
                     format!("Could not create migration file at {}", file_path.display())
                 })?;
@@ -58,8 +64,8 @@ impl App {
 
                 Ok(())
             }
-            Command::Schema { id } => {
-                let mut migrator = Migrator::new();
+            Command::Schema { schema, version } => {
+                let mut migrator = Migrator::default();
                 for entry in self
                     .dir
                     .read_dir()
@@ -76,8 +82,10 @@ impl App {
                     migrator.add_migration(migration);
                 }
 
-                let schema: jtd::Schema =
-                    migrator.schema(id).wrap_err("could not get schema")?.into();
+                let schema: jtd::Schema = migrator
+                    .schema(schema, *version)
+                    .wrap_err("could not get schema")?
+                    .into();
 
                 serde_json::to_writer_pretty(std::io::stdout(), &schema.into_serde_schema())
                     .wrap_err("could not serialize schema")?;
