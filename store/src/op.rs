@@ -3,7 +3,7 @@ use migrate::Value;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 pub struct Row {
     pub schema: String,
     pub id: Uuid,
@@ -11,7 +11,7 @@ pub struct Row {
     pub removed: Option<Hlc>,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 pub struct Field {
     pub schema: String,
     pub row_id: Uuid,

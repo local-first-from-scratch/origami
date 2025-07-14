@@ -1,6 +1,6 @@
 use crate::hlc::Hlc;
 use crate::op::{Field, Row};
-use crate::storage::{RWTransaction, Storage};
+use crate::storage::{ROTransaction, RWTransaction, Storage};
 use migrate::{Migrator, Value, migrator, type_};
 use std::collections::BTreeMap;
 use std::fmt::Display;
@@ -77,6 +77,37 @@ impl<S: Storage> Store<S> {
         tx.commit().await.map_err(Error::Storage)?;
 
         Ok(id)
+    }
+
+    pub async fn list(
+        &self,
+        schema: String,
+    ) -> Result<Vec<BTreeMap<String, Value>>, Error<S::Error>> {
+        let tx = self.storage.ro_transaction().await?;
+
+        let mut out = Vec::new();
+
+        for row in tx.list_rows(&schema).await? {
+            if row.removed.is_some_and(|removed| removed > row.added) {
+                continue;
+            }
+
+            let mut obj = BTreeMap::new();
+
+            for field in tx.list_fields(row.id).await? {
+                // TODO: this is really naive. In particular, it doesn't take
+                // operation ordering or migrations into consideration. Also, it
+                // might be better to write to a cache and then read from it
+                // here instead of reading all the values? Writes are currently
+                // much cheaper than reads, but reads will be much more often
+                // than writes.
+                obj.insert(field.field_name, field.value);
+            }
+
+            out.push(obj)
+        }
+
+        Ok(out)
     }
 }
 

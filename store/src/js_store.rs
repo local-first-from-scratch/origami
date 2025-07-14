@@ -1,6 +1,7 @@
-use crate::storage::idb::{self, IDBStorage};
+use crate::storage::idb::{self, IdbStorage};
 use crate::store::{self, Store as GenericStore};
 use migrate::{Migration, Migrator};
+use serde::Serialize;
 use std::collections::BTreeMap;
 use tokio::sync::RwLock;
 use wasm_bindgen::prelude::*;
@@ -23,7 +24,7 @@ export class Store<T extends TypeMap> {
 
 #[wasm_bindgen(skip_typescript)]
 pub struct Store {
-    store: RwLock<GenericStore<IDBStorage>>,
+    store: RwLock<GenericStore<IdbStorage>>,
 }
 
 /// Technical reason this is separate: store initialization needs to be done asynchronously
@@ -44,12 +45,12 @@ pub async fn store(schemas: JsValue, migrations_raw: JsValue) -> Result<Store, E
     Ok(Store::new(
         migrator,
         serde_wasm_bindgen::from_value(schemas).map_err(Error::SchemaMapping)?,
-        IDBStorage::init().await?,
+        IdbStorage::init().await?,
     ))
 }
 
 impl Store {
-    pub fn new(migrator: Migrator, schemas: BTreeMap<String, usize>, storage: IDBStorage) -> Self {
+    pub fn new(migrator: Migrator, schemas: BTreeMap<String, usize>, storage: IdbStorage) -> Self {
         Store {
             store: RwLock::new(GenericStore::new(migrator, schemas, storage)),
         }
@@ -64,13 +65,13 @@ impl Store {
     // JS side and trip the detection against undefined behavior that
     // wasm-bindgen builds into the binary.
     #[wasm_bindgen]
-    pub async fn insert(&self, table_js: JsString, data: JsValue) -> Result<JsString, Error> {
+    pub async fn insert(&self, schema_js: JsString, data: JsValue) -> Result<JsString, Error> {
         Ok(self
             .store
             .write()
             .await
             .insert(
-                table_js.into(),
+                schema_js.into(),
                 serde_wasm_bindgen::from_value(data).map_err(Error::Value)?,
             )
             .await?
@@ -79,13 +80,12 @@ impl Store {
     }
 
     #[wasm_bindgen]
-    pub async fn list(&self, _schema_js: JsString) -> Result<JsValue, Error> {
-        // let schema: String = schema_js.into();
-        // let rows = self.storage.get_rows(&schema).await?;
+    pub async fn list(&self, schema_js: JsString) -> Result<JsValue, Error> {
+        let values = self.store.read().await.list(schema_js.into()).await?;
 
-        // Ok(serde_wasm_bindgen::to_value(&rows).unwrap())
-        let empty: Vec<()> = Vec::new();
-        serde_wasm_bindgen::to_value(&empty).map_err(Error::Value)
+        values
+            .serialize(&serde_wasm_bindgen::Serializer::new().serialize_maps_as_objects(true))
+            .map_err(Error::Value)
     }
 }
 

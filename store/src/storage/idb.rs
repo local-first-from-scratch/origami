@@ -1,4 +1,4 @@
-use super::{RWTransaction, Storage};
+use super::{ROTransaction, RWTransaction, Storage};
 use crate::op::Row;
 use idb::{
     CursorDirection, Database, KeyPath, Query, TransactionMode,
@@ -6,11 +6,11 @@ use idb::{
 };
 use wasm_bindgen::JsValue;
 
-pub struct IDBStorage {
+pub struct IdbStorage {
     database: Database,
 }
 
-impl IDBStorage {
+impl IdbStorage {
     pub async fn init() -> Result<Self, Error> {
         let database = DatabaseBuilder::new("ops")
             .add_object_store(
@@ -61,24 +61,37 @@ impl IDBStorage {
     }
 }
 
-impl Storage for IDBStorage {
+impl Storage for IdbStorage {
     type Error = Error;
+
     type RWTransaction<'a>
-        = IDBRWTransaction
+        = IdbRWTransaction
+    where
+        Self: 'a;
+
+    type ROTransaction<'a>
+        = IdbROTransaction
     where
         Self: 'a;
 
     async fn rw_transaction(&mut self) -> Result<Self::RWTransaction<'_>, Self::Error> {
-        Ok(IDBRWTransaction(self.database.transaction(
+        Ok(IdbRWTransaction(self.database.transaction(
             &["row", "field"],
             TransactionMode::ReadWrite,
         )?))
     }
+
+    async fn ro_transaction(&self) -> Result<Self::ROTransaction<'_>, Self::Error> {
+        Ok(IdbROTransaction(self.database.transaction(
+            &["row", "field"],
+            TransactionMode::ReadOnly,
+        )?))
+    }
 }
 
-pub struct IDBRWTransaction(idb::Transaction);
+pub struct IdbRWTransaction(idb::Transaction);
 
-impl RWTransaction for IDBRWTransaction {
+impl RWTransaction for IdbRWTransaction {
     type Error = Error;
 
     async fn store_row(&mut self, row: Row) -> Result<(), Error> {
@@ -105,6 +118,45 @@ impl RWTransaction for IDBRWTransaction {
         self.0.abort()?;
 
         Ok(())
+    }
+}
+
+pub struct IdbROTransaction(idb::Transaction);
+
+impl ROTransaction for IdbROTransaction {
+    type Error = Error;
+
+    async fn list_rows(&self, schema: &str) -> Result<Vec<Row>, Self::Error> {
+        let row_store = self.0.object_store("row")?;
+
+        // TODO: would it be quicker to grab the count from the database or reallocate?
+        let mut out = Vec::new();
+
+        for row_raw in row_store
+            .index("by_schema")?
+            .get_all(Some(Query::Key(schema.into())), None)?
+            .await?
+        {
+            out.push(serde_wasm_bindgen::from_value(row_raw)?);
+        }
+
+        Ok(out)
+    }
+
+    async fn list_fields(&self, id: uuid::Uuid) -> Result<Vec<crate::op::Field>, Self::Error> {
+        let field_store = self.0.object_store("field")?;
+
+        let mut out = Vec::new();
+
+        for raw_field in field_store
+            .index("by_row_id")?
+            .get_all(Some(Query::Key(id.to_string().into())), None)?
+            .await?
+        {
+            out.push(serde_wasm_bindgen::from_value(raw_field)?)
+        }
+
+        Ok(out)
     }
 }
 
