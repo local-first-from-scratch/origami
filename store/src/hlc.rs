@@ -17,11 +17,11 @@ impl Hlc {
         let mut out: u64 = 0;
 
         out |= timestamp as u64;
-        out <<= 16;
 
+        out <<= COUNTER_BITS;
         out |= counter as u64;
-        out <<= 16;
 
+        out <<= NODE_BITS;
         out |= node as u64;
 
         Self(out)
