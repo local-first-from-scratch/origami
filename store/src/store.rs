@@ -1,6 +1,6 @@
+use crate::hlc::Hlc;
 use crate::op::{Field, Row};
 use crate::storage::{RWTransaction, Storage};
-use crate::timestamp::Timestamp;
 use migrate::{Migrator, Value, migrator, type_};
 use std::collections::BTreeMap;
 use std::fmt::Display;
@@ -56,7 +56,7 @@ impl<S: Storage> Store<S> {
                     table: table.clone(),
                     row_id: id,
                     field_name: name,
-                    timestamp: Timestamp::new(0, Uuid::nil()), // TODO: Implement timestamp generation
+                    timestamp: Hlc::zero(),
                     schema_version: *schema_version,
                     value,
                 })
@@ -68,7 +68,7 @@ impl<S: Storage> Store<S> {
         tx.store_row(Row {
             table,
             id,
-            added: Timestamp::new(0, Uuid::nil()), // TODO: Implement timestamp generation
+            added: Hlc::zero(), // TODO: Implement timestamp generation
             removed: None,
         })
         .await

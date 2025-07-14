@@ -27,6 +27,10 @@ impl Hlc {
         Self(out)
     }
 
+    pub fn zero() -> Self {
+        Self(0)
+    }
+
     pub fn next(&self, new_timestamp: u32) -> Self {
         // If time is in the past, increment the counter. We don't care if we
         // overflow the bit field used for the counter; we'll always be
