@@ -91,11 +91,11 @@ impl Store {
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("Invalid migration. Details: {0}")]
+    #[error("Invalid migration: {0}")]
     Migration(serde_wasm_bindgen::Error),
-    #[error("Invalid schema mapping. Details: {0}")]
+    #[error("Invalid schema mapping: {0}")]
     SchemaMapping(serde_wasm_bindgen::Error),
-    #[error("Invalid value. Details: {0}")]
+    #[error("Invalid value: {0}")]
     Value(serde_wasm_bindgen::Error),
     #[error("IndexedDB error: {0}")]
     Idb(#[from] idb::Error),
