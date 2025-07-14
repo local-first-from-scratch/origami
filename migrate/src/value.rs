@@ -158,3 +158,28 @@ impl From<&str> for Value {
         Self::String(v.to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    macro_rules! test_roundtrip {
+        ($name: ident, $v: expr) => {
+            #[test]
+            fn $name() {
+                let orig = $v;
+                let roundtrip: Value =
+                    serde_json::from_value(serde_json::to_value(&orig).unwrap()).unwrap();
+
+                assert_eq!(orig, roundtrip)
+            }
+        };
+    }
+
+    test_roundtrip!(string_roundtrip, Value::String("hello!".into()));
+    test_roundtrip!(int_roundtrip, Value::Int(1));
+    test_roundtrip!(float_roundtrip, Value::Float(1.0));
+    test_roundtrip!(bool_roundtrip, Value::Bool(false));
+    test_roundtrip!(null_roundtrip, Value::Null);
+}
