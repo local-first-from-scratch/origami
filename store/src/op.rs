@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct Row {
-    pub table: String,
+    pub schema: String,
     pub id: Uuid,
     pub added: Hlc,
     pub removed: Option<Hlc>,
@@ -13,7 +13,7 @@ pub struct Row {
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct Field {
-    pub table: String,
+    pub schema: String,
     pub row_id: Uuid,
     pub field_name: String,
     pub timestamp: Hlc,

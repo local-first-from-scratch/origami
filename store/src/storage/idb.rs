@@ -16,9 +16,9 @@ impl IDBStorage {
             .add_object_store(
                 ObjectStoreBuilder::new("row")
                     .auto_increment(false)
-                    .key_path(Some(KeyPath::new_array(["table", "id"])))
+                    .key_path(Some(KeyPath::new_array(["schema", "id"])))
                     .add_index(
-                        IndexBuilder::new("by_table".to_string(), KeyPath::new_single("table"))
+                        IndexBuilder::new("by_schema".to_string(), KeyPath::new_single("schema"))
                             .unique(false)
                             .multi_entry(false),
                     ),
@@ -26,7 +26,7 @@ impl IDBStorage {
             .add_object_store(
                 ObjectStoreBuilder::new("field")
                     .auto_increment(false)
-                    .key_path(Some(KeyPath::new_array(["table", "row_id", "field_name"])))
+                    .key_path(Some(KeyPath::new_array(["schema", "row_id", "field_name"])))
                     .add_index(
                         IndexBuilder::new("by_row_id".to_string(), KeyPath::new_single("row_id"))
                             .unique(false)
@@ -39,16 +39,16 @@ impl IDBStorage {
         Ok(Self { database })
     }
 
-    pub async fn get_rows(&self, table: &str) -> Result<Vec<Row>, Error> {
+    pub async fn get_rows(&self, schema: &str) -> Result<Vec<Row>, Error> {
         let tx = self
             .database
             .transaction(&["row"], TransactionMode::ReadOnly)?;
 
         let row_store = tx.object_store("row")?;
-        let by_table = row_store.index("by_table")?;
+        let by_schema = row_store.index("by_schema")?;
 
-        let cursor = by_table
-            .open_cursor(Some(Query::Key(table.into())), Some(CursorDirection::Next))?
+        let cursor = by_schema
+            .open_cursor(Some(Query::Key(schema.into())), Some(CursorDirection::Next))?
             .await?
             .ok_or(Error::MissingCursor)?;
 

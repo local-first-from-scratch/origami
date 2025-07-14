@@ -24,17 +24,17 @@ impl<S: Storage> Store<S> {
 
     pub async fn insert(
         &mut self,
-        table: String,
+        schema_name: String,
         mut data: BTreeMap<String, Value>,
     ) -> Result<Uuid, Error<S::Error>> {
         let schema_version = self
             .schema_to_version
-            .get(&table)
-            .ok_or_else(|| Error::TableNotFound(table.clone()))?;
+            .get(&schema_name)
+            .ok_or_else(|| Error::SchemaNotFound(schema_name.clone()))?;
 
         let schema = self
             .migrator
-            .schema(&table, *schema_version)
+            .schema(&schema_name, *schema_version)
             .map_err(Error::Schema)?;
 
         let mut tx = self
@@ -53,7 +53,7 @@ impl<S: Storage> Store<S> {
                 }
 
                 tx.store_field(Field {
-                    table: table.clone(),
+                    schema: schema_name.clone(),
                     row_id: id,
                     field_name: name,
                     timestamp: Hlc::zero(),
@@ -66,7 +66,7 @@ impl<S: Storage> Store<S> {
         }
 
         tx.store_row(Row {
-            table,
+            schema: schema_name,
             id,
             added: Hlc::zero(), // TODO: Implement timestamp generation
             removed: None,
@@ -85,8 +85,8 @@ pub enum Error<E: std::error::Error> {
     #[error("Storage error: {0}")]
     Storage(#[from] E),
 
-    #[error("Schema not found for table {0}")]
-    TableNotFound(String),
+    #[error("Schema `{0}` not found")]
+    SchemaNotFound(String),
 
     #[error("Error retrieving schema")]
     Schema(migrator::Error),
@@ -137,7 +137,7 @@ mod tests {
 
         let row = &store.storage.rows[0];
 
-        assert_eq!(row.table, "test");
+        assert_eq!(row.schema, "test");
         assert_eq!(row.removed, None);
     }
 
@@ -156,7 +156,7 @@ mod tests {
         let row = &store.storage.rows[0];
         let field = &store.storage.fields[0];
 
-        assert_eq!(field.table, "test");
+        assert_eq!(field.schema, "test");
         assert_eq!(field.row_id, row.id);
         assert_eq!(field.field_name, "test");
         assert_eq!(field.schema_version, 1);

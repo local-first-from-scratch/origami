@@ -14,10 +14,10 @@ export type TypeMap = Record<string, any>;
 export function store<T extends TypeMap>(schemas: Record<keyof T, number>, migrations: any[]): Promise<Store<T>>;
 
 export class Store<T extends TypeMap> {
-  insert<K extends keyof T>(table: K, data: T[K]): Promise<void>;
-  list<K extends keyof T>(table: K): Promise<T[K][]>;
-  // get<K extends keyof T>(table: K, id: string): Promise<T[K]>;
-  // update<K extends keyof T>(table: K, id: String, updater: (current: T[K]) => void): void;
+  insert<K extends keyof T>(schema: K, data: T[K]): Promise<void>;
+  list<K extends keyof T>(schema: K): Promise<T[K][]>;
+  // get<K extends keyof T>(schema: K, id: string): Promise<T[K]>;
+  // update<K extends keyof T>(schema: K, id: String, updater: (current: T[K]) => void): void;
 }
 "#;
 
@@ -79,9 +79,9 @@ impl Store {
     }
 
     #[wasm_bindgen]
-    pub async fn list(&self, _table_js: JsString) -> Result<JsValue, Error> {
-        // let table: String = table_js.into();
-        // let rows = self.storage.get_rows(&table).await?;
+    pub async fn list(&self, _schema_js: JsString) -> Result<JsValue, Error> {
+        // let schema: String = schema_js.into();
+        // let rows = self.storage.get_rows(&schema).await?;
 
         // Ok(serde_wasm_bindgen::to_value(&rows).unwrap())
         let empty: Vec<()> = Vec::new();
