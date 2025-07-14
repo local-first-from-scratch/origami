@@ -1,3 +1,4 @@
+mod clock;
 mod hlc;
 mod js_store;
 mod op;

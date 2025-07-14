@@ -1,3 +1,4 @@
+use crate::clock::js_date::JsDate;
 use crate::storage::idb::{self, IdbStorage};
 use crate::store::{self, Store as GenericStore};
 use migrate::{Migration, Migrator};
@@ -24,7 +25,7 @@ export class Store<T extends TypeMap> {
 
 #[wasm_bindgen(skip_typescript)]
 pub struct Store {
-    store: RwLock<GenericStore<IdbStorage>>,
+    store: RwLock<GenericStore<IdbStorage, JsDate>>,
 }
 
 /// Technical reason this is separate: store initialization needs to be done asynchronously
@@ -52,7 +53,7 @@ pub async fn store(schemas: JsValue, migrations_raw: JsValue) -> Result<Store, E
 impl Store {
     pub fn new(migrator: Migrator, schemas: BTreeMap<String, usize>, storage: IdbStorage) -> Self {
         Store {
-            store: RwLock::new(GenericStore::new(migrator, schemas, storage)),
+            store: RwLock::new(GenericStore::new(migrator, schemas, storage, JsDate)),
         }
     }
 }

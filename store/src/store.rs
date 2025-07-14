@@ -1,3 +1,4 @@
+use crate::clock::Clock;
 use crate::hlc::Hlc;
 use crate::op::{Field, Row};
 use crate::storage::{ROTransaction, RWTransaction, Storage};
@@ -7,18 +8,25 @@ use std::fmt::Display;
 use uuid::Uuid;
 use wasm_bindgen::JsValue;
 
-pub struct Store<S: Storage> {
+pub struct Store<S: Storage, C: Clock> {
     migrator: Migrator,
     schema_to_version: BTreeMap<String, usize>,
     storage: S,
+    clock: C,
 }
 
-impl<S: Storage> Store<S> {
-    pub fn new(migrator: Migrator, schema_to_version: BTreeMap<String, usize>, storage: S) -> Self {
+impl<S: Storage, C: Clock> Store<S, C> {
+    pub fn new(
+        migrator: Migrator,
+        schema_to_version: BTreeMap<String, usize>,
+        storage: S,
+        clock: C,
+    ) -> Self {
         Self {
             migrator,
             schema_to_version,
             storage,
+            clock,
         }
     }
 
@@ -135,10 +143,11 @@ impl<E: std::error::Error + Display> From<Error<E>> for JsValue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::clock::system_time::SystemTime;
     use crate::storage::memory::MemoryStorage;
     use migrate::{AddRemoveField, Lens, Type};
 
-    fn init() -> Store<MemoryStorage> {
+    fn init() -> Store<MemoryStorage, SystemTime> {
         let mut migrator = Migrator::default();
         migrator.add_migration(migrate::Migration {
             schema: "test".into(),
@@ -154,6 +163,7 @@ mod tests {
             migrator,
             BTreeMap::from([("test".into(), 1)]),
             MemoryStorage::default(),
+            SystemTime,
         )
     }
 
