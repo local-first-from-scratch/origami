@@ -43,6 +43,10 @@ impl Hlc {
         }
     }
 
+    pub fn set_node(&self, new_node: u16) -> Self {
+        Self(self.0 & NODE_MASK | new_node as u64)
+    }
+
     #[inline]
     pub fn timestamp(&self) -> u32 {
         (self.0 >> TIMESTAMP_BITS) as u32
@@ -119,5 +123,14 @@ mod tests {
         assert_eq!(hlc.timestamp(), 1);
         assert_eq!(hlc.counter(), 0);
         assert_eq!(hlc.node(), 3);
+    }
+
+    #[test]
+    fn set_node() {
+        let hlc = Hlc::new_at(0, 0, 1).set_node(2);
+
+        assert_eq!(hlc.timestamp(), 0);
+        assert_eq!(hlc.counter(), 0);
+        assert_eq!(hlc.node(), 2);
     }
 }
