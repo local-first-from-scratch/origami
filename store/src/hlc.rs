@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]
 pub struct Hlc(u64);
 
 const TIMESTAMP_BITS: u32 = 32;
@@ -132,5 +132,29 @@ mod tests {
         assert_eq!(hlc.timestamp(), 0);
         assert_eq!(hlc.counter(), 0);
         assert_eq!(hlc.node(), 2);
+    }
+
+    #[test]
+    fn ord_timestamp_first() {
+        let a = Hlc::new_at(0, 1, 1);
+        let b = Hlc::new_at(1, 0, 0);
+
+        assert!(a < b, "{a:?} was not less than {b:?}")
+    }
+
+    #[test]
+    fn ord_counter_second() {
+        let a = Hlc::new_at(0, 0, 1);
+        let b = Hlc::new_at(0, 1, 0);
+
+        assert!(a < b, "{a:?} was not less than {b:?}")
+    }
+
+    #[test]
+    fn ord_node_third() {
+        let a = Hlc::new_at(0, 0, 0);
+        let b = Hlc::new_at(0, 0, 1);
+
+        assert!(a < b, "{a:?} was not less than {b:?}")
     }
 }
