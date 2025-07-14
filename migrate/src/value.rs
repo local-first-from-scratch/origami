@@ -1,6 +1,7 @@
-use std::fmt::Display;
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Visitor};
+use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Clone, serde::Serialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     String(String),
     Int(i64),
@@ -10,7 +11,7 @@ pub enum Value {
 }
 
 impl Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
             Value::String(s) => write!(f, "{s}"),
             Value::Int(i) => write!(f, "{i}"),
@@ -27,10 +28,10 @@ impl Value {
     }
 }
 
-impl<'de> serde::Deserialize<'de> for Value {
+impl<'de> Deserialize<'de> for Value {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>,
+        D: Deserializer<'de>,
     {
         deserializer.deserialize_any(ValueVisitor)
     }
@@ -38,10 +39,10 @@ impl<'de> serde::Deserialize<'de> for Value {
 
 struct ValueVisitor;
 
-impl<'de> serde::de::Visitor<'de> for ValueVisitor {
+impl<'de> Visitor<'de> for ValueVisitor {
     type Value = Value;
 
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
         formatter.write_str("a string, integer, float, boolean, or null")
     }
 
@@ -107,9 +108,24 @@ impl<'de> serde::de::Visitor<'de> for ValueVisitor {
 
     fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
-        D: serde::Deserializer<'de>,
+        D: Deserializer<'de>,
     {
         deserializer.deserialize_any(ValueVisitor)
+    }
+}
+
+impl Serialize for Value {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Bool(b) => serializer.serialize_bool(*b),
+            Value::String(s) => serializer.serialize_str(s),
+            Value::Int(i) => serializer.serialize_i64(*i),
+            Value::Float(f) => serializer.serialize_f64(*f),
+            Value::Null => serializer.serialize_unit(),
+        }
     }
 }
 
