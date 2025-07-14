@@ -1,3 +1,4 @@
+mod hlc;
 mod js_store;
 mod op;
 mod storage;
