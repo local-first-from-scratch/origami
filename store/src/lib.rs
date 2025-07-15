@@ -1,8 +1,10 @@
+mod clock;
+mod hlc;
 mod js_store;
+mod node;
 mod op;
 mod storage;
 mod store;
-mod timestamp;
 
 #[cfg(test)]
 mod test_helpers;
