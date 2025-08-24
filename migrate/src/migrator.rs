@@ -9,22 +9,22 @@ pub struct Migrator {
 impl Migrator {
     pub fn add_migration(&mut self, migration: Migration) {
         let Migration {
-            schema: table,
+            schema,
             version,
             ops,
         } = migration;
 
-        let table_entry = self.paths.entry(table).or_default();
+        let schema_entry = self.paths.entry(schema).or_default();
 
         if version == 0 {
             todo!("Raise an error if version is 0; that's reserved for the blank schema");
         }
 
-        table_entry.insert(
+        schema_entry.insert(
             (version, version - 1),
             ops.iter().rev().map(|op| op.reversed()).collect(),
         );
-        table_entry.insert((version - 1, version), ops);
+        schema_entry.insert((version - 1, version), ops);
     }
 
     pub fn migration_path(&self, schema: &str, from: usize, to: usize) -> Option<Vec<&Lens>> {

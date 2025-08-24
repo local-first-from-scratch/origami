@@ -28,6 +28,7 @@ store<{ test: Row }>({ test: 1 }, migrations).then(async (s) => {
   console.log(s);
   console.log(await s.insert('test', { test: 'test' }));
   s.list('test').then((r) => {
+    console.log(r);
     rows.value = r;
   });
 });
