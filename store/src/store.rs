@@ -1,40 +1,52 @@
+use crate::clock::Clock;
+use crate::hlc::Hlc;
+use crate::node::Node;
 use crate::op::{Field, Row};
-use crate::storage::{RWTransaction, Storage};
-use crate::timestamp::Timestamp;
+use crate::storage::{ROTransaction, RWTransaction, Storage};
 use migrate::{Migrator, Value, migrator, type_};
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use uuid::Uuid;
 use wasm_bindgen::JsValue;
 
-pub struct Store<S: Storage> {
+pub struct Store<S: Storage, C: Clock, N: Node> {
     migrator: Migrator,
     schema_to_version: BTreeMap<String, usize>,
     storage: S,
+    clock: C,
+    node: N,
 }
 
-impl<S: Storage> Store<S> {
-    pub fn new(migrator: Migrator, schema_to_version: BTreeMap<String, usize>, storage: S) -> Self {
+impl<S: Storage, C: Clock, N: Node> Store<S, C, N> {
+    pub fn new(
+        migrator: Migrator,
+        schema_to_version: BTreeMap<String, usize>,
+        storage: S,
+        clock: C,
+        node: N,
+    ) -> Self {
         Self {
             migrator,
             schema_to_version,
             storage,
+            clock,
+            node,
         }
     }
 
     pub async fn insert(
         &mut self,
-        table: String,
+        schema_name: String,
         mut data: BTreeMap<String, Value>,
     ) -> Result<Uuid, Error<S::Error>> {
         let schema_version = self
             .schema_to_version
-            .get(&table)
-            .ok_or_else(|| Error::TableNotFound(table.clone()))?;
+            .get(&schema_name)
+            .ok_or_else(|| Error::SchemaNotFound(schema_name.clone()))?;
 
         let schema = self
             .migrator
-            .schema(&table, *schema_version)
+            .schema(&schema_name, *schema_version)
             .map_err(Error::Schema)?;
 
         let mut tx = self
@@ -53,10 +65,10 @@ impl<S: Storage> Store<S> {
                 }
 
                 tx.store_field(Field {
-                    table: table.clone(),
+                    schema: schema_name.clone(),
                     row_id: id,
                     field_name: name,
-                    timestamp: Timestamp::new(0, Uuid::nil()), // TODO: Implement timestamp generation
+                    timestamp: Hlc::zero(),
                     schema_version: *schema_version,
                     value,
                 })
@@ -66,9 +78,9 @@ impl<S: Storage> Store<S> {
         }
 
         tx.store_row(Row {
-            table,
+            schema: schema_name,
             id,
-            added: Timestamp::new(0, Uuid::nil()), // TODO: Implement timestamp generation
+            added: Hlc::zero(), // TODO: Implement timestamp generation
             removed: None,
         })
         .await
@@ -78,6 +90,37 @@ impl<S: Storage> Store<S> {
 
         Ok(id)
     }
+
+    pub async fn list(
+        &self,
+        schema: String,
+    ) -> Result<Vec<BTreeMap<String, Value>>, Error<S::Error>> {
+        let tx = self.storage.ro_transaction().await?;
+
+        let mut out = Vec::new();
+
+        for row in tx.list_rows(&schema).await? {
+            if row.removed.is_some_and(|removed| removed > row.added) {
+                continue;
+            }
+
+            let mut obj = BTreeMap::new();
+
+            for field in tx.list_fields(row.id).await? {
+                // TODO: this is really naive. In particular, it doesn't take
+                // operation ordering or migrations into consideration. Also, it
+                // might be better to write to a cache and then read from it
+                // here instead of reading all the values? Writes are currently
+                // much cheaper than reads, but reads will be much more often
+                // than writes.
+                obj.insert(field.field_name, field.value);
+            }
+
+            out.push(obj)
+        }
+
+        Ok(out)
+    }
 }
 
 #[derive(Debug, thiserror::Error, PartialEq)]
@@ -85,8 +128,8 @@ pub enum Error<E: std::error::Error> {
     #[error("Storage error: {0}")]
     Storage(#[from] E),
 
-    #[error("Schema not found for table {0}")]
-    TableNotFound(String),
+    #[error("Schema `{0}` not found")]
+    SchemaNotFound(String),
 
     #[error("Error retrieving schema")]
     Schema(migrator::Error),
@@ -104,10 +147,12 @@ impl<E: std::error::Error + Display> From<Error<E>> for JsValue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::clock::system_time::SystemTime;
+    use crate::node::memory_node::MemoryNode;
     use crate::storage::memory::MemoryStorage;
     use migrate::{AddRemoveField, Lens, Type};
 
-    fn init() -> Store<MemoryStorage> {
+    fn init() -> Store<MemoryStorage, SystemTime, MemoryNode> {
         let mut migrator = Migrator::default();
         migrator.add_migration(migrate::Migration {
             schema: "test".into(),
@@ -123,6 +168,8 @@ mod tests {
             migrator,
             BTreeMap::from([("test".into(), 1)]),
             MemoryStorage::default(),
+            SystemTime,
+            MemoryNode::new(0),
         )
     }
 
@@ -137,7 +184,7 @@ mod tests {
 
         let row = &store.storage.rows[0];
 
-        assert_eq!(row.table, "test");
+        assert_eq!(row.schema, "test");
         assert_eq!(row.removed, None);
     }
 
@@ -156,7 +203,7 @@ mod tests {
         let row = &store.storage.rows[0];
         let field = &store.storage.fields[0];
 
-        assert_eq!(field.table, "test");
+        assert_eq!(field.schema, "test");
         assert_eq!(field.row_id, row.id);
         assert_eq!(field.field_name, "test");
         assert_eq!(field.schema_version, 1);
