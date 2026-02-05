@@ -21,7 +21,7 @@ tokio = { version = "1.46.1", features = ["macros", "rt"] }
 [dev-dependencies]
 pretty_assertions = "1.4.1"
 proptest = "1.7.0"
-proptest-derive = "0.6.0"
+proptest-derive = "0.8.0"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-Oz']
